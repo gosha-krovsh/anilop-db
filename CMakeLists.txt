@@ -5,10 +5,39 @@ set(CMAKE_CXX_STANDARD 20)
 
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Werror -Wextra -fsanitize=address,leak")
 
-add_subdirectory(googletest-master)
-include_directories(googletest-master/googletest/include)
-include_directories(googletest-master/googlemock/include)
+include(FetchContent)
+FetchContent_Declare(
+  gtest
+  URL https://github.com/google/googletest/archive/03597a01ee50ed33e9dfd640b249b4be3799d395.zip
+)
+FetchContent_MakeAvailable(gtest)
 
-add_executable(Anilop main.cpp)
+include_directories(./)
 
-target_link_libraries(Anilop gtest gtest_main)
+add_executable(Anilop
+    main.cpp
+    
+    exception/exception.h 
+    exception/exception.cpp
+
+    dal/dal.h
+    dal/dal.cpp
+    dal/page.h
+    dal/page.cpp
+    dal/freelist.h
+    dal/freelist.cpp
+)
+
+enable_testing()
+
+add_executable(
+    DALTest
+    test/dal_test.cpp
+)
+target_link_libraries(
+    DALTest
+    GTest::gtest_main
+)
+
+include(GoogleTest)
+gtest_discover_tests(DALTest)

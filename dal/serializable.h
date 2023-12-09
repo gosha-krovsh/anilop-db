@@ -1,10 +1,7 @@
 #ifndef SERIALIZABLE_H_
 #define SERIALIZABLE_H_
 
-#include <cstdint>
-
-using size_t = decltype(sizeof(uint64_t));
-using byte = char;
+#include "type.h"
 
 class ISerializable {
    public:

@@ -1,7 +1,10 @@
+#ifndef PAGE_H_
+#define PAGE_H_
+
 #include <cstdint>
 #include <vector>
 
-using byte = char;
+#include "type.h"
 
 class Page {
    public:
@@ -18,3 +21,5 @@ class Page {
     u_int64_t page_num_;
     std::vector<byte> data_;
 };
+
+#endif  // PAGE_H_

@@ -1,12 +1,17 @@
+#ifndef DAL_H_
+#define DAL_H_
+
 #include <fstream>
 #include <filesystem>
 #include <cstdint>
 #include <memory>
 #include <string>
 
-#include "exception/exception.h"
-#include "meta.h"
+#include "type.h"
 #include "page.h"
+#include "meta.h"
+#include "freelist.h"
+#include "exception/exception.h"
 
 class DAL {
 public:
@@ -25,9 +30,15 @@ private:
   void writeMeta();
   void readMeta();
 
+  void readFreeList();
+  void writeFreeList();
+
   size_t page_size_;
   std::fstream file_;
 
   const uint64_t meta_page_num_ = 0;
-  Meta meta_;
+  std::shared_ptr<Meta> meta_;
+  std::shared_ptr<FreeList> free_list_;
 };
+
+#endif  // DAL_H_

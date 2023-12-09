@@ -1,11 +1,13 @@
+#ifndef FREELIST_H_
+#define FREELIST_H_
+
 #include <cstdint>
 #include <vector>
 
+#include "type.h"
 #include "serializable.h"
 #include "convert/convert.h"
 #include "exception/exception.h"
-
-using byte = char;
 
 class FreeList : public ISerializable {
    public:
@@ -24,3 +26,5 @@ class FreeList : public ISerializable {
     uint64_t max_page_;
     std::vector<uint64_t> realeased_pages_;
 };
+
+#endif  // FREELIST_H_

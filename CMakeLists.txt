@@ -20,12 +20,18 @@ add_executable(Anilop
     exception/exception.h 
     exception/exception.cpp
 
+    convert/convert.h
+    convert/convert.cpp
+
     dal/dal.h
     dal/dal.cpp
     dal/page.h
     dal/page.cpp
     dal/freelist.h
     dal/freelist.cpp
+    dal/meta.h
+    dal/meta.cpp
+    dal/serializable.h
 )
 
 enable_testing()

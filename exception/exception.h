@@ -4,7 +4,7 @@
 #include <stdexcept>
 #include <string>
 
-namespace data_layer {
+namespace dal_error {
 
 class InsufficientBufferSize : public std::runtime_error {
    public:
@@ -25,14 +25,6 @@ class CorruptedBuffer : public std::runtime_error {
 class LowPageVolume : public std::runtime_error {
    public:
     LowPageVolume(const std::string& message);
-
-   private:
-    std::string message_;
-};
-
-class IncorrectPageSize : public std::runtime_error {
-   public:
-    IncorrectPageSize(const std::string& message);
 
    private:
     std::string message_;

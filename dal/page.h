@@ -5,11 +5,13 @@
 #include <vector>
 
 #include "type.h"
+#include "settings/settings.h"
+#include "exception/exception.h"
 
 class Page {
    public:
-    Page(size_t page_size, const std::vector<byte>& data);
-    Page(size_t page_size);
+    Page();
+    Page(const std::vector<byte>& data);
 
     void SetPageNum(uint64_t page_num);
     uint64_t GetPageNum() const;

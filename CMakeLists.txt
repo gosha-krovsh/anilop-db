@@ -20,13 +20,20 @@ add_executable(Anilop
     exception/exception.h 
     exception/exception.cpp
 
-    convert/convert.h
-    convert/convert.cpp
+    memory/memory.h
+    memory/memory.cpp
+
+    settings/settings.h
+    settings/settings.cpp
 
     dal/dal.h
     dal/dal.cpp
     dal/page.h
     dal/page.cpp
+    dal/item.h
+    dal/item.cpp
+    dal/node.h
+    dal/node.cpp
     dal/freelist.h
     dal/freelist.cpp
     dal/meta.h

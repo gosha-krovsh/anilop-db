@@ -1,15 +1,14 @@
 #include "page.h"
 
-Page::Page(size_t page_size, const std::vector<byte>& data)
+Page::Page(const std::vector<byte>& data)
     : data_(std::move(data)) {
-    if (data_.size() > page_size) {
-        // TODO(George) throw exception here
+    if (data_.size() > settings::kPageSize) {
+        throw dal_error::LowPageVolume("Page size is not big enough to store data.");
     }
-    // Maybe useless
-    data_.resize(page_size);
+    data_.resize(settings::kPageSize);
 }
 
-Page::Page(size_t page_size) : data_(page_size) {}
+Page::Page() : data_(settings::kPageSize) {}
 
 void Page::SetPageNum(uint64_t page_num) { 
     page_num_ = page_num;

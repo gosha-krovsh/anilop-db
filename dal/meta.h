@@ -5,7 +5,7 @@
 
 #include "type.h"
 #include "serializable.h"
-#include "convert/convert.h"
+#include "memory/memory.h"
 #include "exception/exception.h"
 
 class Meta : public ISerializable {
@@ -13,7 +13,7 @@ class Meta : public ISerializable {
     Meta() = default;
 
     size_t Serialize(byte* data, size_t max_volume) override;
-    size_t Deserialize(byte* data, size_t max_volume) override;
+    size_t Deserialize(const byte* data, size_t max_volume) override;
 
     uint64_t GetFreeListPage();
     void SetFreeListPage(uint64_t page);

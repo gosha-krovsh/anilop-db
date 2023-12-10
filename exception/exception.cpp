@@ -3,9 +3,6 @@
 dal_error::LowPageVolume::LowPageVolume(const std::string& message)
     : std::runtime_error(message) {}
 
-dal_error::IncorrectData::IncorrectData(const std::string& message)
-    : std::runtime_error(message) {}
-
 dal_error::FileError::FileError(const std::string& message)
     : std::runtime_error(message) {}
 

@@ -5,8 +5,9 @@
 #include <cstdint>
 #include <vector>
 
-#include "type.h"
 #include "serializable.h"
+
+#include "memory/type.h"
 #include "memory/memory.h"
 #include "exception/exception.h"
 

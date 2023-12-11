@@ -2,7 +2,7 @@
 #include <cstdint>
 #include <cstring>
 
-#include "dal/type.h"
+#include "type.h"
 
 namespace memory {
 

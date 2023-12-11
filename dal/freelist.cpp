@@ -1,6 +1,8 @@
 #include "freelist.h"
 
-FreeList::FreeList() : max_page_(0), realeased_pages_() {}
+FreeList::FreeList() : FreeList(0) {}
+
+FreeList::FreeList(uint64_t max_page) : max_page_(max_page), realeased_pages_() {}
 
 size_t FreeList::Serialize(byte* data, size_t max_volume) {
     size_t o_size = realeased_pages_.size() * uint64_t_size + 2 * uint64_t_size;

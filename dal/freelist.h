@@ -4,14 +4,16 @@
 #include <cstdint>
 #include <vector>
 
-#include "type.h"
 #include "serializable.h"
+
+#include "memory/type.h"
 #include "memory/memory.h"
 #include "exception/exception.h"
 
 class FreeList : public ISerializable {
    public:
     FreeList();
+    FreeList(uint64_t max_page);
 
     size_t Serialize(byte* data, size_t max_volume) override;
     size_t Deserialize(const byte* data, size_t max_volume) override;

@@ -38,6 +38,6 @@ void Meta::SetFreeListPage(uint64_t page) {
     free_list_page_ = page;
 }
 
-uint64_t Meta::GetRootPage() { return 0; }
+uint64_t Meta::GetRootPage() { return root_; }
 
 void Meta::SetRootPage(uint64_t page) {}

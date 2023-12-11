@@ -4,7 +4,7 @@
 #include <cstdint>
 #include <vector>
 
-#include "type.h"
+#include "memory/type.h"
 #include "settings/settings.h"
 #include "exception/exception.h"
 

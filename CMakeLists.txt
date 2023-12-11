@@ -16,15 +16,16 @@ include_directories(./)
 
 add_executable(Anilop
     main.cpp
+
+    settings/settings.h
+    settings/settings.cpp
     
     exception/exception.h 
     exception/exception.cpp
 
+    memory/type.h
     memory/memory.h
     memory/memory.cpp
-
-    settings/settings.h
-    settings/settings.cpp
 
     dal/dal.h
     dal/dal.cpp
@@ -39,6 +40,9 @@ add_executable(Anilop
     dal/meta.h
     dal/meta.cpp
     dal/serializable.h
+
+    storage/storage.h
+    storage/storage.cpp
 )
 
 enable_testing()

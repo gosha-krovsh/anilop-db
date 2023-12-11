@@ -1,7 +1,7 @@
 #ifndef SERIALIZABLE_H_
 #define SERIALIZABLE_H_
 
-#include "type.h"
+#include "memory/type.h"
 
 class ISerializable {
    public:

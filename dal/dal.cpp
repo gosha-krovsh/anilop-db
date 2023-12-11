@@ -3,7 +3,7 @@
 DAL::DAL(const std::string& path) :
       file_(),
       meta_(new Meta()),
-      free_list_(new FreeList()) {
+      free_list_(new FreeList(settings::kMaxPage)) {
     // Check file existance and read metadata if needed
     bool file_exist = std::filesystem::exists(path);
     file_.open(path);
@@ -16,6 +16,10 @@ DAL::DAL(const std::string& path) :
         meta_->SetFreeListPage(free_list_->GetNextPage());
         writeMeta();
     }
+}
+
+std::shared_ptr<Meta> DAL::GetMetaPtr() {
+    return meta_;
 }
 
 std::shared_ptr<Page> DAL::AllocateEmptyPage() {
@@ -50,6 +54,14 @@ void DAL::WritePage(const std::shared_ptr<Page>& page) {
     if (file_.fail()) {
         throw dal_error::FileError("File write failed.");
     }
+}
+
+uint64_t DAL::GetNextPage() {
+    return free_list_->GetNextPage(); 
+}
+
+void DAL::ReleasePage(uint64_t page_num) {
+    free_list_->RealeasePage(page_num);
 }
 
 void DAL::close() {

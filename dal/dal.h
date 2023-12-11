@@ -7,10 +7,11 @@
 #include <memory>
 #include <string>
 
-#include "type.h"
 #include "page.h"
 #include "meta.h"
 #include "freelist.h"
+
+#include "memory/type.h"
 #include "settings/settings.h"
 #include "exception/exception.h"
 
@@ -18,9 +19,14 @@ class DAL {
 public:
   DAL(const std::string &path);
 
+  std::shared_ptr<Meta> GetMetaPtr();
+
   std::shared_ptr<Page> AllocateEmptyPage();
   std::shared_ptr<Page> ReadPage(uint64_t page_num);
   void WritePage(const std::shared_ptr<Page>& page);
+
+  uint64_t GetNextPage();
+  void ReleasePage(uint64_t page_num);
 
   void close();
 

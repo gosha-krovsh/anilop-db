@@ -3,8 +3,9 @@
 
 #include <string>
 
-#include "type.h"
 #include "serializable.h"
+
+#include "memory/type.h"
 #include "memory/memory.h"
 #include "exception/exception.h"
 
@@ -22,8 +23,8 @@ class Meta : public ISerializable {
 
    private:
     std::string magic_word = "ANILOPDB";
-    uint64_t free_list_page_;
-    uint64_t root_;
+    uint64_t free_list_page_ = -1;
+    uint64_t root_ = -1;
 };
 
 #endif  // META_H_

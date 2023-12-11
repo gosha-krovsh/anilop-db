@@ -9,6 +9,18 @@ size_t Item::ByteLength() {
     return 2 * uint64_t_size + key_.size() + value_.size();
 }
 
+size_t Item::KeySize() { 
+    return key_.size();
+}
+
+byte* Item::KeyData() { return key_.data(); }
+
+size_t Item::ValueSize() { 
+    return value_.size();    
+}
+
+byte* Item::ValueData() { return value_.data(); }
+
 size_t Item::Serialize(byte* data, size_t max_volume) {
     size_t o_size = 2 * uint64_t_size + key_.size() + value_.size();
     if (max_volume < o_size) {

@@ -17,7 +17,7 @@
 
 class DAL {
 public:
-  DAL(const std::string &path);
+  DAL(const std::string &path, const settings::UserSettings& user_settings);
 
   std::shared_ptr<Meta> GetMetaPtr();
 

@@ -18,6 +18,12 @@ class Item : public ISerializable {
 
     size_t ByteLength();
 
+    size_t KeySize();
+    byte* KeyData();
+
+    size_t ValueSize();
+    byte* ValueData();
+
     size_t Serialize(byte* data, size_t max_volume) override;
     size_t Deserialize(const byte* data, size_t max_volume) override;
 

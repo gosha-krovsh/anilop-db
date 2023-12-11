@@ -10,6 +10,8 @@ size_t Meta::Serialize(byte* data, size_t max_volume) {
     memory::uint64_to_bytes(data, root_);
     data += uint64_t_size;
     memory::uint64_to_bytes(data, free_list_page_);
+    data += uint64_t_size;
+    memory::uint64_to_bytes(data, page_size_);
 
     return o_size;
 }
@@ -28,8 +30,18 @@ size_t Meta::Deserialize(const byte* data, size_t max_volume) {
     root_ = memory::bytes_to_uint64(data);
     data += uint64_t_size;
     free_list_page_ = memory::bytes_to_uint64(data);
+    data += uint64_t_size;
+    page_size_ = memory::bytes_to_uint64(data);
 
     return r_size;
+}
+
+uint64_t Meta::GetPageSize() {
+    return page_size_;
+}
+
+void Meta::SetPageSize(uint64_t page_size) {
+    page_size_ = page_size;
 }
 
 uint64_t Meta::GetFreeListPage() { return free_list_page_; }

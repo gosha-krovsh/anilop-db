@@ -12,8 +12,21 @@ uint64_t Node::GetPageNum() const {
     return page_num_; 
 }
 
+std::vector<uint64_t>* Node::ChildNodesPtr() { return &child_nodes_; }
+
+std::vector<std::shared_ptr<Item>>* Node::ItemsPtr() { return &items_; }
+
+size_t Node::ByteLength() {
+    size_t length = uint64_t_size;
+    for (const auto& item : items_) {
+        length += item->ByteLength();
+    }
+    length += child_nodes_.size() * uint64_t_size;
+    return length;
+}
+
 size_t Node::Serialize(byte* data, size_t max_volume) { 
-    if (max_volume != settings::kPageSize) {
+    if (max_volume < ByteLength()) {
         throw dal_error::CorruptedBuffer("Buffer size is too low for serialisation."); 
     }
     // Serialize leaf status
@@ -51,13 +64,10 @@ size_t Node::Serialize(byte* data, size_t max_volume) {
         memory::uint64_to_bytes(data, child_nodes_.back());
     }
 
-    return settings::kPageSize;
+    return max_volume;
 }
 
-size_t Node::Deserialize(const byte* data, size_t max_volume) { 
-    if (max_volume != settings::kPageSize) {
-        throw dal_error::CorruptedBuffer("Buffer size is too low for serialisation."); 
-    }
+size_t Node::Deserialize(const byte* data, size_t max_volume) {
     items_.clear();
     child_nodes_.clear(); 
     // Deserialize leaf status
@@ -79,13 +89,16 @@ size_t Node::Deserialize(const byte* data, size_t max_volume) {
         if (leaf_bit == 0) {  // Derialize child node page_num 
             child_nodes_.emplace_back(memory::bytes_to_uint64(data));
             left_ptr += uint64_t_size;
+            CheckPtrInterDeser(left_ptr, right_ptr);
         }
 
         // Deserialize offset
         size_t offset = memory::bytes_to_uint64(left_ptr);
         left_ptr += uint64_t_size;
+        CheckPtrInterDeser(left_ptr, right_ptr);
         // Deserialize item
         right_ptr -= offset;
+        CheckPtrInterDeser(left_ptr, right_ptr);
         item->Deserialize(right_ptr, offset);
 
         items_.emplace_back(item);
@@ -95,5 +108,11 @@ size_t Node::Deserialize(const byte* data, size_t max_volume) {
         child_nodes_.emplace_back(memory::bytes_to_uint64(left_ptr));
     }
 
-    return settings::kPageSize;    
+    return max_volume;    
+}
+
+void Node::CheckPtrInterDeser(const char* left, const char* right) {
+    if (right <= left) {
+        throw dal_error::CorruptedBuffer("Buffer size is too low for deserialisation."); 
+    }
 }

@@ -6,10 +6,13 @@
 
 namespace settings {
 
-extern size_t kPageSize;
 extern size_t kMaxPage;
-extern uint16_t kNodeSizeMax;
-extern uint16_t kNodeCountMax;
+
+struct UserSettings {
+    size_t page_size = 4096;
+    double min_fill_percent = 0.2;
+    double max_fill_percent = 0.95;
+};
 
 }  // namespace settings
 

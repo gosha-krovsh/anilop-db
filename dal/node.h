@@ -22,10 +22,17 @@ class Node : public ISerializable {
     void SetPageNum(uint64_t page_num);
     uint64_t GetPageNum() const;
 
+    std::vector<uint64_t>* ChildNodesPtr();
+    std::vector<std::shared_ptr<Item>>* ItemsPtr();
+
+    size_t ByteLength();
+
     size_t Serialize(byte* data, size_t max_volume) override;
     size_t Deserialize(const byte* data, size_t max_volume) override;
 
    private:
+    void CheckPtrInterDeser(const char* left, const char* right);
+
     uint64_t page_num_;
     std::vector<uint64_t> child_nodes_;
     std::vector<std::shared_ptr<Item>> items_;

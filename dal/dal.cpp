@@ -1,6 +1,7 @@
 #include "dal.h"
 
-DAL::DAL(const std::string& path) :
+DAL::DAL(const std::string& path, 
+         const settings::UserSettings& user_settings) :
       file_(),
       meta_(new Meta()),
       free_list_(new FreeList(settings::kMaxPage)) {
@@ -14,6 +15,7 @@ DAL::DAL(const std::string& path) :
     } else {
         // Gets a page for free_list_ and updates metadata
         meta_->SetFreeListPage(free_list_->GetNextPage());
+        meta_->SetPageSize(user_settings.page_size);
         writeMeta();
     }
 }
@@ -23,19 +25,19 @@ std::shared_ptr<Meta> DAL::GetMetaPtr() {
 }
 
 std::shared_ptr<Page> DAL::AllocateEmptyPage() {
-    return std::shared_ptr<Page>(new Page());
+    return std::shared_ptr<Page>(new Page(meta_->GetPageSize()));
 }
 
 std::shared_ptr<Page> DAL::ReadPage(uint64_t page_num) {
     std::shared_ptr<Page> page = AllocateEmptyPage();
     // Page offset in file
-    uint64_t offset = page_num * settings::kPageSize;
+    uint64_t offset = page_num * meta_->GetPageSize();
     // Retrieve page from file
     file_.seekg(offset);
     if (file_.fail()) {
         throw dal_error::FileError("File is corrupted.");
     }
-    file_.readsome(page->Data(), settings::kPageSize);
+    file_.readsome(page->Data(), meta_->GetPageSize());
     if (file_.fail()) {
         throw dal_error::FileError("File read failed.");
     }
@@ -44,13 +46,13 @@ std::shared_ptr<Page> DAL::ReadPage(uint64_t page_num) {
 }
 
 void DAL::WritePage(const std::shared_ptr<Page>& page) {
-    uint64_t offset = page->GetPageNum() * settings::kPageSize;
+    uint64_t offset = page->GetPageNum() * meta_->GetPageSize();
     // Write page into file
     file_.seekp(offset);
     if (file_.fail()) {
         throw dal_error::FileError("File is corrupted.");
     }
-    file_.write(page->Data(), settings::kPageSize);
+    file_.write(page->Data(), meta_->GetPageSize());
     if (file_.fail()) {
         throw dal_error::FileError("File write failed.");
     }
@@ -77,24 +79,24 @@ void DAL::writeMeta() {
     std::shared_ptr<Page> page = AllocateEmptyPage();
     page->SetPageNum(meta_page_num_);
     
-    meta_->Serialize(page->Data(), settings::kPageSize);
+    meta_->Serialize(page->Data(), meta_->GetPageSize());
     WritePage(page);
 }
 
 void DAL::readMeta() {
     std::shared_ptr<Page> page = ReadPage(meta_page_num_);
-    meta_->Deserialize(page->Data(), settings::kPageSize);
+    meta_->Deserialize(page->Data(), meta_->GetPageSize());
 }
 
 void DAL::writeFreeList() {
     std::shared_ptr<Page> page = AllocateEmptyPage();
 	page->SetPageNum(meta_->GetFreeListPage());
 	
-    free_list_->Serialize(page->Data(), settings::kPageSize);
+    free_list_->Serialize(page->Data(), meta_->GetPageSize());
     WritePage(page);
 }
 
 void DAL::readFreeList() {
     std::shared_ptr<Page> page = ReadPage(meta_->GetFreeListPage());
-    free_list_->Deserialize(page->Data(), settings::kPageSize);
+    free_list_->Deserialize(page->Data(), meta_->GetPageSize());
 }

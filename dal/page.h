@@ -10,8 +10,8 @@
 
 class Page {
    public:
-    Page();
-    Page(const std::vector<byte>& data);
+    Page(uint64_t page_size);
+    Page(uint64_t page_size, const std::vector<byte>& data);
 
     void SetPageNum(uint64_t page_num);
     uint64_t GetPageNum() const;
@@ -20,7 +20,9 @@ class Page {
     const byte* Data() const;
 
    private:
-    u_int64_t page_num_;
+    uint64_t page_size_;
+
+    uint64_t page_num_;
     std::vector<byte> data_;
 };
 

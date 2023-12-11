@@ -12,3 +12,6 @@ dal_error::InsufficientBufferSize::InsufficientBufferSize(
 
 dal_error::CorruptedBuffer::CorruptedBuffer(const std::string& message)
     : std::runtime_error(message) {}
+
+storage_error::InsertFailure::InsertFailure(const std::string& message)
+    : std::runtime_error(message) {}

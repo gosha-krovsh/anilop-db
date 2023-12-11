@@ -40,4 +40,16 @@ class FileError : public std::runtime_error {
 
 }  // namespace data_layer
 
+namespace storage_error {
+
+class InsertFailure : public std::runtime_error {
+   public:
+    InsertFailure(const std::string& message);
+
+   private:
+    std::string message_;
+};
+
+}  // namespace data_layer
+
 #endif  // EXCEPTION_H_ 

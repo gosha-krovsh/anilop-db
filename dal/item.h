@@ -24,6 +24,9 @@ class Item : public ISerializable {
     size_t ValueSize();
     byte* ValueData();
 
+    std::vector<byte> GetKey();
+    std::vector<byte> GetValue();
+
     size_t Serialize(byte* data, size_t max_volume) override;
     size_t Deserialize(const byte* data, size_t max_volume) override;
 

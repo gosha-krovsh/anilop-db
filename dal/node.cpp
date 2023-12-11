@@ -12,16 +12,26 @@ uint64_t Node::GetPageNum() const {
     return page_num_; 
 }
 
+void Node::AddItem(const std::shared_ptr<Item>& item, size_t pos) {
+    items_.insert(items_.begin() + pos, item);
+}
+
 std::vector<uint64_t>* Node::ChildNodesPtr() { return &child_nodes_; }
 
 std::vector<std::shared_ptr<Item>>* Node::ItemsPtr() { return &items_; }
 
+size_t Node::HeaderByteLength() { 
+    size_t length = 1 + 2;  // leaf_bit, len of pairs
+    length += items_.size() * uint64_t_size;  // offsets
+    length += child_nodes_.size() * uint64_t_size;  // child pointers
+    return length;
+}
+
 size_t Node::ByteLength() {
-    size_t length = uint64_t_size;
+    size_t length = HeaderByteLength();
     for (const auto& item : items_) {
         length += item->ByteLength();
     }
-    length += child_nodes_.size() * uint64_t_size;
     return length;
 }
 

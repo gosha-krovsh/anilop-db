@@ -22,9 +22,12 @@ class Node : public ISerializable {
     void SetPageNum(uint64_t page_num);
     uint64_t GetPageNum() const;
 
+    void AddItem(const std::shared_ptr<Item>& item, size_t pos);
+
     std::vector<uint64_t>* ChildNodesPtr();
     std::vector<std::shared_ptr<Item>>* ItemsPtr();
 
+    size_t HeaderByteLength();
     size_t ByteLength();
 
     size_t Serialize(byte* data, size_t max_volume) override;

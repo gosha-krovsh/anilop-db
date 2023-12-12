@@ -2,7 +2,7 @@
 
 Node::Node() {}
 
-bool Node::isLeaf() { return child_nodes_.size() == 0; }
+bool Node::IsLeaf() { return child_nodes_.size() == 0; }
 
 void Node::SetPageNum(uint64_t page_num) {
     page_num_ = page_num;
@@ -41,7 +41,7 @@ size_t Node::Serialize(byte* data, size_t max_volume) {
     }
     // Serialize leaf status
     char leaf_bit = 0; 
-    if (isLeaf()) {
+    if (IsLeaf()) {
         leaf_bit = 1;
     }
     data[0] = leaf_bit;
@@ -55,7 +55,7 @@ size_t Node::Serialize(byte* data, size_t max_volume) {
     for (size_t i = 0; i < items_.size(); ++i) {
         std::shared_ptr<Item> item = items_[i];
         
-        if (!isLeaf()) {  // Serialize child node page_num 
+        if (!IsLeaf()) {  // Serialize child node page_num 
             uint64_t child_node = child_nodes_[i];
             memory::uint64_to_bytes(data, child_node);
             left_ptr += uint64_t_size;
@@ -70,7 +70,7 @@ size_t Node::Serialize(byte* data, size_t max_volume) {
         item->Serialize(right_ptr, item->ByteLength());
     }
     // Serialize last child
-    if (!isLeaf()) {
+    if (!IsLeaf()) {
         memory::uint64_to_bytes(data, child_nodes_.back());
     }
 

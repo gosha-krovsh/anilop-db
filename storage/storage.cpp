@@ -66,6 +66,35 @@ void Storage::Put(const std::vector<byte> key, const std::vector<byte> value) {
     }
 }
 
+void Storage::Remove(const std::vector<byte> key) {
+    auto root_node = GetNode(root_);
+
+    auto [remove_node, remove_index, ancestor_indices] = FindKey(key, true);
+    if (remove_node == std::nullptr_t()) {
+        return;
+    }
+
+    if (remove_node->IsLeaf()) {
+        RemoveFromLeaf(remove_node, remove_index);
+    } else {
+        auto affected_nodes = RemoveFromInternal(remove_node, remove_index);
+        ancestor_indices.insert(ancestor_indices.end(), affected_nodes.begin(), affected_nodes.end());
+    }
+
+    auto ancestors = GetNodes(ancestor_indices);
+    for (uint64_t i = ancestors.size() - 2; i >= 0; --i) {
+        auto parent_node = ancestors[i];
+        auto node = ancestors[i + 1];
+        if (IsUnderPopulated(node)) {
+            RemoveAndRebalance(parent_node, node, ancestor_indices[i + 1]);
+        }
+    }
+
+    if (root_node->ItemsPtr()->empty() && !root_node->ChildNodesPtr()->empty()) {
+        root_ = ancestors[1]->GetPageNum();
+    }
+}
+
 std::shared_ptr<Node> Storage::GetNode(uint64_t page_num) {
     std::shared_ptr<Page> page = dal_->ReadPage(page_num);
     std::shared_ptr<Node> node(new Node());
@@ -133,7 +162,7 @@ std::tuple<std::shared_ptr<Node>, size_t> Storage::FindKeyRecursive(
         return std::tie(node, index);
     }
 
-    if (node->isLeaf()) {
+    if (node->IsLeaf()) {
         if (!exact_key) {
             return std::tie(node, index);
         }
@@ -188,7 +217,7 @@ void Storage::Split(const std::shared_ptr<Node>& parent, const std::shared_ptr<N
     std::shared_ptr<Item> middle_item = child->ItemsPtr()->operator[](split_index);
     std::shared_ptr<Node> new_node = std::shared_ptr<Node>(new Node());
 
-    if (child->isLeaf()) {
+    if (child->IsLeaf()) {
         (*new_node->ItemsPtr()) = {child->ItemsPtr()->begin() + split_index + 1,
                                    child->ItemsPtr()->end()};
         WriteNode(new_node);
@@ -214,4 +243,153 @@ void Storage::Split(const std::shared_ptr<Node>& parent, const std::shared_ptr<N
     }
     WriteNode(parent);
     WriteNode(child);
+}
+
+void Storage::RemoveFromLeaf(const std::shared_ptr<Node>& node, size_t item_index) {
+    node->ItemsPtr()->erase(node->ItemsPtr()->begin() + item_index);
+    WriteNode(node);
+}
+
+std::vector<size_t> Storage::RemoveFromInternal(const std::shared_ptr<Node>& parent_node,
+                                                size_t item_index) {
+    /* Finds an element, that can replace current. Applies changes and returns touched nodes */
+    std::vector<size_t> affected_children = {item_index};
+
+    auto current_node_page = parent_node->ChildNodesPtr()->operator[](item_index);
+    auto current_node = GetNode(current_node_page);
+    while (!current_node->IsLeaf()) {
+        size_t next_index = current_node->ChildNodesPtr()->size() - 1;
+        current_node_page = parent_node->ChildNodesPtr()->operator[](next_index);
+        current_node = GetNode(current_node_page);
+
+        affected_children.emplace_back(next_index);
+    }
+
+    auto& parent_items = *parent_node->ItemsPtr();
+    auto& current_items = *current_node->ItemsPtr();
+    parent_items[item_index] = current_items[current_items.size() - 1];
+
+    WriteNode(parent_node);
+    WriteNode(current_node);
+    return affected_children;
+}
+
+void Storage::LeftRotate(const std::shared_ptr<Node>& lhs, const std::shared_ptr<Node>& mhs,
+                         const std::shared_ptr<Node>& rhs, size_t r_node_index) {
+    // Remove left element from rhs node
+    std::shared_ptr<Item> r_item = rhs->ItemsPtr()->front();
+    rhs->ItemsPtr()->erase(rhs->ItemsPtr()->begin());
+
+    // Update parents(middle) element
+    size_t parent_r_item = r_node_index;
+    if (r_node_index == mhs->ChildNodesPtr()->size() - 1) {
+        parent_r_item = r_node_index - 1;
+    }
+    std::shared_ptr<Item> m_item = mhs->ItemsPtr()->operator[](parent_r_item);
+    mhs->ItemsPtr()->operator[](parent_r_item) = r_item;
+
+    // Update left element
+    lhs->ItemsPtr()->emplace_back(m_item);
+
+    // Update leaves
+    if (!rhs->IsLeaf()) {
+        auto child_node_ptr = rhs->ChildNodesPtr()->operator[](0);
+        rhs->ChildNodesPtr()->erase(rhs->ChildNodesPtr()->begin());
+
+        lhs->ChildNodesPtr()->emplace_back(child_node_ptr);
+    }
+}
+
+void Storage::RightRotate(const std::shared_ptr<Node>& lhs, const std::shared_ptr<Node>& mhs,
+                          const std::shared_ptr<Node>& rhs, size_t r_node_index) {
+    // Remove right element from lhs node
+    std::shared_ptr<Item> l_item = lhs->ItemsPtr()->back();
+    lhs->ItemsPtr()->pop_back();
+
+    // Update parents(middle) element
+    size_t parent_r_item = 0;
+    if (r_node_index != 0) {
+        parent_r_item = r_node_index - 1;
+    } else {
+        parent_r_item = 0;
+    }
+    std::shared_ptr<Item> m_item = mhs->ItemsPtr()->operator[](parent_r_item);
+    mhs->ItemsPtr()->operator[](parent_r_item) = l_item;
+
+    // Update right element
+    rhs->ItemsPtr()->insert(rhs->ItemsPtr()->begin(), l_item);
+
+    // Update leaves
+    if (!lhs->IsLeaf()) {
+        auto child_node_ptr = lhs->ChildNodesPtr()->back();
+        lhs->ChildNodesPtr()->pop_back();
+
+        rhs->ChildNodesPtr()->insert(rhs->ChildNodesPtr()->begin(), child_node_ptr);
+    }
+}
+
+void Storage::Merge(const std::shared_ptr<Node>& parent, const std::shared_ptr<Node>& unbalanced,
+                    size_t u_node_index) {
+    uint64_t lhs_node_ptr = parent->ChildNodesPtr()->operator[](u_node_index - 1);
+    auto lhs_node = GetNode(lhs_node_ptr);
+
+    // Update parent. Move item from parent to left_node
+    auto parent_item = parent->ItemsPtr()->operator[](u_node_index - 1);
+    parent->ItemsPtr()->erase(parent->ItemsPtr()->begin() + u_node_index - 1);
+    lhs_node->ItemsPtr()->emplace_back(parent_item);
+
+    // Add unbalanced items to left node
+    for (auto item : *unbalanced->ItemsPtr()) {
+        lhs_node->ItemsPtr()->emplace_back(item);
+        if (!lhs_node->IsLeaf()) {
+            lhs_node->ItemsPtr()->emplace_back(item);    
+        }
+    }
+    if (!lhs_node->IsLeaf()) {
+        for (auto child_ptr: *unbalanced->ChildNodesPtr()) {
+            lhs_node->ChildNodesPtr()->emplace_back(child_ptr);
+        }
+    }
+
+    WriteNode(parent);
+    WriteNode(lhs_node);
+    DeleteNode(unbalanced->GetPageNum());
+}
+
+void Storage::RemoveAndRebalance(const std::shared_ptr<Node>& parent,
+                              const std::shared_ptr<Node>& unbalanced, size_t u_node_index) {
+    // Right rotate, if we can
+    if (u_node_index != 0) {
+        auto lhs_node = GetNode(parent->ChildNodesPtr()->operator[](u_node_index - 1));
+        if (!IsUnderPopulated(lhs_node)) {
+            RightRotate(lhs_node, parent, unbalanced, u_node_index);
+            WriteNode(lhs_node);
+            WriteNode(parent);
+            WriteNode(unbalanced);
+
+            return;
+        }
+    }
+
+    // Left rotate, if we can
+    if (u_node_index != parent->ChildNodesPtr()->size() - 1) {
+        auto rhs_node = GetNode(parent->ChildNodesPtr()->operator[](u_node_index + 1));
+        if (!IsUnderPopulated(rhs_node)) {
+            LeftRotate(unbalanced, parent, rhs_node, u_node_index);
+            WriteNode(rhs_node);
+            WriteNode(parent);
+            WriteNode(unbalanced);
+
+            return;
+        }
+    }
+
+    // Nothing worked. Merge
+    if (u_node_index == 0) {
+        auto rhs_node = GetNode(parent->ChildNodesPtr()->operator[](u_node_index + 1));
+        Merge(parent, rhs_node, u_node_index);
+
+        return;
+    }
+    Merge(parent, unbalanced, u_node_index);
 }

@@ -13,7 +13,7 @@ class Meta : public ISerializable {
    public:
     Meta() = default;
 
-    size_t Serialize(byte* data, size_t max_volume) override;
+    size_t Serialize(byte* data, size_t max_volume) const override;
     size_t Deserialize(const byte* data, size_t max_volume) override;
 
     uint64_t GetPageSize();

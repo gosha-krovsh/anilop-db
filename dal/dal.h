@@ -7,6 +7,7 @@
 #include <memory>
 #include <string>
 
+#include "log.h"
 #include "page.h"
 #include "meta.h"
 #include "freelist.h"
@@ -17,7 +18,9 @@
 
 class DAL {
 public:
-  DAL(const std::string &path, const settings::UserSettings& user_settings);
+  DAL(const std::string& path,
+      const std::string& log_path,
+      const settings::UserSettings& user_settings);
 
   std::shared_ptr<Meta> GetMetaPtr();
 
@@ -27,6 +30,12 @@ public:
 
   uint64_t GetNextPage();
   void ReleasePage(uint64_t page_num);
+
+  bool canWriteLog();
+
+  std::vector<byte> ReadLogBuffer();
+  void WriteLog(const Log& log);
+  void ClearLogs();
 
   void close();
 
@@ -40,6 +49,7 @@ private:
   void writeFreeList();
 
   std::fstream file_;
+  std::fstream  log_file_;
 
   const uint64_t meta_page_num_ = 0;
   std::shared_ptr<Meta> meta_;

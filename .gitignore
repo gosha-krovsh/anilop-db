@@ -1,2 +1,4 @@
 build/
 googletest-master/
+cmake-build-debug-wsl/
+cmake-build-release-wsl/

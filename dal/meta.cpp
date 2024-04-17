@@ -1,6 +1,6 @@
 #include "meta.h"
 
-size_t Meta::Serialize(byte* data, size_t max_volume) {
+size_t Meta::Serialize(byte* data, size_t max_volume) const {
     size_t o_size = (magic_word.size() + 1 + 2 * uint64_t_size);
     if (max_volume < o_size) {
         throw dal_error::CorruptedBuffer("Buffer is too low for serialization.");

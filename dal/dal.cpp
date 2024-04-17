@@ -1,11 +1,15 @@
 #include "dal.h"
 
-DAL::DAL(const std::string& path, 
+#include <memory>
+
+DAL::DAL(const std::string& path,
+         const std::string& log_path,
          const settings::UserSettings& user_settings) :
-      file_(),
+      file_(path, std::ios::binary),
+      log_file_(log_path, std::ios::binary),
       meta_(new Meta()),
       free_list_(new FreeList(settings::kMaxPage)) {
-    // Check file existance and read metadata if needed
+    // Check file existence and read metadata if needed
     bool file_exist = std::filesystem::exists(path);
     file_.open(path);
 
@@ -25,7 +29,7 @@ std::shared_ptr<Meta> DAL::GetMetaPtr() {
 }
 
 std::shared_ptr<Page> DAL::AllocateEmptyPage() {
-    return std::shared_ptr<Page>(new Page(meta_->GetPageSize()));
+    return std::make_shared<Page>(meta_->GetPageSize());
 }
 
 std::shared_ptr<Page> DAL::ReadPage(uint64_t page_num) {
@@ -56,6 +60,11 @@ void DAL::WritePage(const std::shared_ptr<Page>& page) {
     if (file_.fail()) {
         throw dal_error::FileError("File write failed.");
     }
+    // Flush is important to keep data up to date
+    file_.flush();
+    if (file_.fail()) {
+        throw dal_error::FileError("File flush failed.");
+    }
 }
 
 uint64_t DAL::GetNextPage() {
@@ -63,11 +72,15 @@ uint64_t DAL::GetNextPage() {
 }
 
 void DAL::ReleasePage(uint64_t page_num) {
-    free_list_->RealeasePage(page_num);
+    free_list_->ReleasePage(page_num);
 }
 
 void DAL::close() {
     file_.close();
+    if (file_.fail()) {
+        throw dal_error::FileError("File close failed.");
+    }
+    log_file_.close();
     if (file_.fail()) {
         throw dal_error::FileError("File close failed.");
     }
@@ -99,4 +112,37 @@ void DAL::writeFreeList() {
 void DAL::readFreeList() {
     std::shared_ptr<Page> page = ReadPage(meta_->GetFreeListPage());
     free_list_->Deserialize(page->Data(), meta_->GetPageSize());
+}
+
+bool DAL::canWriteLog() {
+    return free_list_->HasFreePages();
+}
+
+std::vector<byte> DAL::ReadLogBuffer() {
+    auto size = log_file_.tellg();
+    if (size == 0) {
+        return {};
+    }
+    std::vector<byte> buffer(size);
+    log_file_.read(buffer.data(), size);
+    return buffer;
+}
+
+void DAL::ClearLog() {
+    log_file_.clear();
+}
+
+void DAL::WriteLog(const Log &log) {
+    std::vector<byte> data(log.GetLogSize());
+    log.Serialize(data.data(), data.size());
+
+    log_file_.write(data.data(), data.size());
+    if (log_file_.fail()) {
+        throw dal_error::FileError("Log file write failed.");
+    }
+    // Flush is important to keep data up to date
+    log_file_.flush();
+    if (log_file_.fail()) {
+        throw dal_error::FileError("Log file flush failed.");
+    }
 }

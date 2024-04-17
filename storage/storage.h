@@ -4,21 +4,30 @@
 #include <cstring>
 #include <memory>
 #include <tuple>
+#include <mutex>
 
 #include "dal/dal.h"
 #include "dal/node.h"
 #include "memory/type.h"
 #include "settings/settings.h"
+#include "storage/log_storage.h"
 
 class Storage {
    public:
-    Storage(const std::string& path, const settings::UserSettings& settings);
+    Storage(const std::string& path,
+            const settings::UserSettings& settings);
+    ~Storage();
 
-    std::tuple<std::vector<byte>, bool> Find(const std::vector<byte>& key);
-    void Put(const std::vector<byte> key, const std::vector<byte> value);
-    void Remove(const std::vector<byte> key);
+    std::optional<std::vector<byte>> Find(const std::vector<byte>& key);
+    void Put(const std::vector<byte>& key, const std::vector<byte>& value);
+    void Remove(const std::vector<byte>& key);
 
    private:
+    // Tree functions
+    std::optional<std::vector<byte>> FindInTree(const std::vector<byte>& key);
+    void PutInTree(const std::vector<byte>& key, const std::vector<byte>& value);
+    void RemoveInTree(const std::vector<byte>& key);
+
     // Memory workflow functions
     std::shared_ptr<Node> GetNode(uint64_t page_num);
     std::vector<std::shared_ptr<Node>> GetNodes(const std::vector<uint64_t>& page_nums);
@@ -41,7 +50,7 @@ class Storage {
     std::tuple<size_t, bool> FindKeyInNode(const std::shared_ptr<Node>& node,
                                            const std::vector<byte>& key);
     // Put helpers
-    uint64_t GetSplitIndex(const std::shared_ptr<Node>& node);
+    int64_t GetSplitIndex(const std::shared_ptr<Node>& node);
     void Split(const std::shared_ptr<Node>& parent, const std::shared_ptr<Node>& child,
                size_t childIndex);
     // Remove helpers
@@ -57,9 +66,17 @@ class Storage {
     void RemoveAndRebalance(const std::shared_ptr<Node>& parent, const std::shared_ptr<Node>& unbalanced,
                          size_t u_node_index);
 
+    void PushLog();
+    void PushLogAsync();
+
+    std::mutex mutex_;
+
     settings::UserSettings settings_;
     std::shared_ptr<DAL> dal_;
     uint64_t root_;
+
+    // Storage extension
+    LogStorage log_storage_;
 };
 
 #endif  // STORAGE_H_

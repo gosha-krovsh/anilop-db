@@ -96,7 +96,7 @@ size_t Node::Deserialize(const byte* data, size_t max_volume) {
     for (size_t i = 0; i < items_size; ++i) {
         Item* item = new Item;
         
-        if (leaf_bit == 0) {  // Derialize child node page_num 
+        if (leaf_bit == 0) {  // Deserialize child node page_num
             child_nodes_.emplace_back(memory::bytes_to_uint64(data));
             left_ptr += uint64_t_size;
             CheckPtrInterDeser(left_ptr, right_ptr);

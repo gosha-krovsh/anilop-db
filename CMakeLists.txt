@@ -43,6 +43,10 @@ add_executable(Anilop
 
     storage/storage.h
     storage/storage.cpp
+    storage/log_storage.h
+    storage/log_storage.cpp
+        dal/log.cpp
+        dal/log.h
 )
 
 enable_testing()

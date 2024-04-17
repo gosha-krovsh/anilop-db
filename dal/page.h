@@ -10,7 +10,7 @@
 
 class Page {
    public:
-    Page(uint64_t page_size);
+    explicit Page(uint64_t page_size);
     Page(uint64_t page_size, const std::vector<byte>& data);
 
     void SetPageNum(uint64_t page_num);

@@ -1,26 +1,62 @@
 #include "storage.h"
 
-Storage::Storage(const std::string& path, const settings::UserSettings& settings)
-    : settings_(settings),
-      dal_(new DAL(path, settings)),
-      root_(dal_->GetMetaPtr()->GetRootPage()) {}
+#include <memory>
+#include <thread>
 
-std::tuple<std::vector<byte>, bool> Storage::Find(const std::vector<byte>& key) {
+Storage::Storage(
+        const std::string& path,
+        const settings::UserSettings& settings)
+    : settings_(settings),
+      dal_(new DAL(path, path + ".log", settings)),
+      root_(dal_->GetMetaPtr()->GetRootPage()),
+      log_storage_(dal_, settings_){}
+
+std::optional<std::vector<byte>> Storage::Find(const std::vector<byte>& key) {
+    std::unique_lock lock(mutex_);
+    auto log_result = log_storage_.Find(key);
+    if (log_result.has_value()) {
+        return log_result;
+    }
+
+    return FindInTree(key);
+}
+
+void Storage::Put(const std::vector<byte>& key, const std::vector<byte>& value) {
+    std::unique_lock lock(mutex_);
+    // Log workflow
+    if (log_storage_.Put(key, value)) {
+        PushLogAsync();
+        return;
+    }
+    // Tree workflow
+    PutInTree(key, value);
+}
+
+void Storage::Remove(const std::vector<byte>& key) {
+    std::unique_lock lock(mutex_);
+    // Log workflow
+    if (log_storage_.Remove(key)) {
+        return;
+    }
+    // Tree workflow
+    RemoveInTree(key);
+}
+
+std::optional<std::vector<byte>> Storage::FindInTree(const std::vector<byte>& key) {
     if (root_ == 0) {
-        return std::forward_as_tuple(std::vector<byte>(), false);
+        return std::nullopt;
     } else {
         auto [node, index, _] = FindKey(key, true);
         if (node == std::nullptr_t()) {
-            return std::forward_as_tuple(std::vector<byte>(), false);
+            return std::nullopt;
         } else {
-            return std::forward_as_tuple(node->ItemsPtr()->operator[](index)->GetValue(), false);
+            return std::make_optional(node->ItemsPtr()->operator[](index)->GetValue());
         }
     }
 }
 
-void Storage::Put(const std::vector<byte> key, const std::vector<byte> value) {
+void Storage::PutInTree(const std::vector<byte>& key, const std::vector<byte>& value) {
     std::shared_ptr<Item> new_item = std::make_shared<Item>(key, value);
-
     std::shared_ptr<Node> root_node;
     if (root_ == 0) {
         root_node = std::make_shared<Node>();
@@ -42,11 +78,11 @@ void Storage::Put(const std::vector<byte> key, const std::vector<byte> value) {
     }
     WriteNode(insert_node);
 
-    // Get all ancestores
+    // Get all ancestors
     auto ancestors = GetNodes(ancestor_indices);
 
     // Split nodes, except root, if necessary
-    for (uint64_t i = ancestors.size() - 2; i >= 0; --i) {
+    for (int64_t i = ancestors.size() - 2; i >= 0; --i) {
         auto parent_node = ancestors[i];
         auto child_node = ancestors[i + 1];
         auto child_index = ancestor_indices[i + 1];
@@ -66,7 +102,7 @@ void Storage::Put(const std::vector<byte> key, const std::vector<byte> value) {
     }
 }
 
-void Storage::Remove(const std::vector<byte> key) {
+void Storage::RemoveInTree(const std::vector<byte>& key) {
     auto root_node = GetNode(root_);
 
     auto [remove_node, remove_index, ancestor_indices] = FindKey(key, true);
@@ -82,7 +118,7 @@ void Storage::Remove(const std::vector<byte> key) {
     }
 
     auto ancestors = GetNodes(ancestor_indices);
-    for (uint64_t i = ancestors.size() - 2; i >= 0; --i) {
+    for (int64_t i = ancestors.size() - 2; i >= 0; --i) {
         auto parent_node = ancestors[i];
         auto node = ancestors[i + 1];
         if (IsUnderPopulated(node)) {
@@ -176,7 +212,7 @@ std::tuple<std::shared_ptr<Node>, size_t> Storage::FindKeyRecursive(
 
 std::tuple<size_t, bool> Storage::FindKeyInNode(const std::shared_ptr<Node>& node,
                                                 const std::vector<byte>& key) {
-    for (int i = 0; i < node->ItemsPtr()->size(); ++i) {
+    for (size_t i = 0; i < node->ItemsPtr()->size(); ++i) {
         std::shared_ptr<Item> item = (*node->ItemsPtr())[i];
         int comp_result =
             std::memcmp(item->KeyData(), key.data(), std::min(key.size(), item->KeySize()));
@@ -191,7 +227,7 @@ std::tuple<size_t, bool> Storage::FindKeyInNode(const std::shared_ptr<Node>& nod
     return std::forward_as_tuple(node->ItemsPtr()->size(), false);
 }
 
-uint64_t Storage::GetSplitIndex(const std::shared_ptr<Node>& node) {
+int64_t Storage::GetSplitIndex(const std::shared_ptr<Node>& node) {
     size_t byte_length = node->HeaderByteLength();
     size_t items_size = node->ItemsPtr()->size();
     for (size_t i = 0; i < items_size; ++i) {
@@ -208,14 +244,14 @@ uint64_t Storage::GetSplitIndex(const std::shared_ptr<Node>& node) {
 
 void Storage::Split(const std::shared_ptr<Node>& parent, const std::shared_ptr<Node>& child,
                     size_t child_index) {
-    uint64_t split_index = GetSplitIndex(child);
+    int64_t split_index = GetSplitIndex(child);
     if (split_index == -1) {
         throw storage_error::InsertFailure(
             "Insert failed. Split called on lonely/underpopulated node.");
     }
 
     std::shared_ptr<Item> middle_item = child->ItemsPtr()->operator[](split_index);
-    std::shared_ptr<Node> new_node = std::shared_ptr<Node>(new Node());
+    std::shared_ptr<Node> new_node = std::make_shared<Node>();
 
     if (child->IsLeaf()) {
         (*new_node->ItemsPtr()) = {child->ItemsPtr()->begin() + split_index + 1,
@@ -392,4 +428,29 @@ void Storage::RemoveAndRebalance(const std::shared_ptr<Node>& parent,
         return;
     }
     Merge(parent, unbalanced, u_node_index);
+}
+
+void Storage::PushLog() {
+    std::unique_lock lock(mutex_);
+
+    const auto& logs = log_storage_.GetLogs();
+    for (const auto& log : logs) {
+        if (log.GetCommand() == Log::Command::PUT) {
+            PutInTree(log.GetKey(), log.GetValue());
+        } else (log.GetCommand() == Log::Command::REMOVE) {
+            PutInTree(log.GetKey());
+        }
+    }
+    log_storage_.Clear();
+}
+
+void Storage::PushLogAsync() {
+    auto thread = std::thread([this]() mutable {
+        PushLog();
+    });
+    // Thread is not joined, call is a non-blocking operation
+}
+
+Storage::~Storage() {
+    PushLog();
 }

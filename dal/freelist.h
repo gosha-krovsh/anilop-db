@@ -13,20 +13,23 @@
 class FreeList : public ISerializable {
    public:
     FreeList();
-    FreeList(uint64_t max_page);
+    explicit FreeList(uint64_t max_page);
 
-    size_t Serialize(byte* data, size_t max_volume) override;
+    size_t Serialize(byte* data, size_t max_volume) const override;
     size_t Deserialize(const byte* data, size_t max_volume) override;
 
-    uint64_t GetMaxPage();
+    uint64_t GetMaxPage() const;
     void SetMaxPage(uint64_t max_page);
 
     uint64_t GetNextPage();
-    void RealeasePage(uint64_t page_num);
+    void ReleasePage(uint64_t page_num);
+
+    bool HasFreePages();
 
    private:
     uint64_t max_page_;
-    std::vector<uint64_t> realeased_pages_;
+    uint64_t current_max_page_;
+    std::vector<uint64_t> released_pages_;
 };
 
 #endif  // FREELIST_H_

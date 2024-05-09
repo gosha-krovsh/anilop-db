@@ -19,7 +19,6 @@
 class DAL {
 public:
   DAL(const std::string& path,
-      const std::string& log_path,
       const settings::UserSettings& user_settings);
 
   std::shared_ptr<Meta> GetMetaPtr();
@@ -31,14 +30,9 @@ public:
   uint64_t GetNextPage();
   void ReleasePage(uint64_t page_num);
 
-  bool canWriteLog();
-
-  std::vector<byte> ReadLogBuffer();
-  void WriteLog(const Log& log);
-  void ClearLogs();
+  bool CanWrite();
 
   void close();
-
   ~DAL();
 
 private:
@@ -49,9 +43,11 @@ private:
   void writeFreeList();
 
   std::fstream file_;
-  std::fstream  log_file_;
+  std::fstream log_file_;
+  std::fstream memory_log_file_;
 
   const uint64_t meta_page_num_ = 0;
+  std::shared_ptr<MemoryLogMeta> memory_log_meta_;
   std::shared_ptr<Meta> meta_;
   std::shared_ptr<FreeList> free_list_;
 };

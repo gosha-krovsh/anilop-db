@@ -1,35 +1,45 @@
 #include "storage.h"
 
 #include <memory>
+#include <ranges>
 #include <thread>
+#include <unordered_set>
 
 Storage::Storage(
         const std::string& path,
         const settings::UserSettings& settings)
     : settings_(settings),
-      dal_(new DAL(path, path + ".log", settings)),
+      dal_(new DAL(path, settings)),
+      log_dal_(new LogDAL(path + ".log", settings)),
+      memory_log_dal_(new MemoryLogDAL(path + ".mlog", settings)),
       root_(dal_->GetMetaPtr()->GetRootPage()),
-      log_storage_(dal_, settings_){}
+      log_storage_(dal_, log_dal_, settings_){}
 
 std::optional<std::vector<byte>> Storage::Find(const std::vector<byte>& key) {
-    std::unique_lock lock(mutex_);
+    std::shared_lock lock(mutex_);
     auto log_result = log_storage_.Find(key);
     if (log_result.has_value()) {
+        ClearState();
         return log_result;
     }
 
-    return FindInTree(key);
+    auto result = FindInTree(key);
+
+    ClearState();
+    return result;
 }
 
 void Storage::Put(const std::vector<byte>& key, const std::vector<byte>& value) {
     std::unique_lock lock(mutex_);
     // Log workflow
     if (log_storage_.Put(key, value)) {
-        PushLogAsync();
         return;
     }
+    PushLogAsync();
     // Tree workflow
     PutInTree(key, value);
+    // Clear saved state
+    ClearState();
 }
 
 void Storage::Remove(const std::vector<byte>& key) {
@@ -40,9 +50,64 @@ void Storage::Remove(const std::vector<byte>& key) {
     }
     // Tree workflow
     RemoveInTree(key);
+    // Clear saved state
+    ClearState();
+}
+
+void Storage::Restore() {
+    auto saved_allocation = memory_log_dal_->GetSavedPageAllocations();
+    auto saved_pages = memory_log_dal_->GetSavedPages();
+
+    for (auto pg_num : saved_allocation)
+        dal_->ReleasePage(pg_num);
+
+    for (auto [pg_num, page] : saved_pages) {
+        page->SetPageNum(pg_num);
+        dal_->WritePage(page);
+    }
+}
+
+void Storage::ClearState() {
+    memory_log_dal_->Clear();
 }
 
 std::optional<std::vector<byte>> Storage::FindInTree(const std::vector<byte>& key) {
+    try {
+        return FindInTreeImpl(key);
+    }
+    catch (...)
+    {
+        Restore();
+        ClearState();
+        throw;
+    }
+}
+
+void Storage::PutInTree(const std::vector<byte>& key, const std::vector<byte>& value) {
+    try {
+        PutInTreeImpl(key, value);
+    }
+    catch (...)
+    {
+        Restore();
+        ClearState();
+        throw;
+    }
+}
+
+void Storage::RemoveInTree(const std::vector<byte>& key) {
+    try {
+        RemoveInTreeImpl(key);
+    }
+    catch (...)
+    {
+        Restore();
+        ClearState();
+        throw;
+    }
+}
+
+std::optional<std::vector<byte>> Storage::FindInTreeImpl(const std::vector<byte> &key) {
     if (root_ == 0) {
         return std::nullopt;
     } else {
@@ -55,7 +120,7 @@ std::optional<std::vector<byte>> Storage::FindInTree(const std::vector<byte>& ke
     }
 }
 
-void Storage::PutInTree(const std::vector<byte>& key, const std::vector<byte>& value) {
+void Storage::PutInTreeImpl(const std::vector<byte> &key, const std::vector<byte> &value) {
     std::shared_ptr<Item> new_item = std::make_shared<Item>(key, value);
     std::shared_ptr<Node> root_node;
     if (root_ == 0) {
@@ -102,7 +167,7 @@ void Storage::PutInTree(const std::vector<byte>& key, const std::vector<byte>& v
     }
 }
 
-void Storage::RemoveInTree(const std::vector<byte>& key) {
+void Storage::RemoveInTreeImpl(const std::vector<byte> &key) {
     auto root_node = GetNode(root_);
 
     auto [remove_node, remove_index, ancestor_indices] = FindKey(key, true);
@@ -131,6 +196,7 @@ void Storage::RemoveInTree(const std::vector<byte>& key) {
     }
 }
 
+
 std::shared_ptr<Node> Storage::GetNode(uint64_t page_num) {
     std::shared_ptr<Page> page = dal_->ReadPage(page_num);
     std::shared_ptr<Node> node(new Node());
@@ -153,8 +219,15 @@ void Storage::WriteNode(const std::shared_ptr<Node>& node) {
     if (node->GetPageNum() == 0) {
         uint64_t new_page_num = dal_->GetNextPage();
         node->SetPageNum(new_page_num);
+
+        memory_log_dal_->SavePageAllocation(node->GetPageNum());
     }
-    page->SetPageNum(node->GetPageNum());
+    else {
+        page->SetPageNum(node->GetPageNum());
+        // Save node state before serialization
+        dal_->ReadPage(node->GetPageNum());
+        memory_log_dal_->SavePage(page->GetPageNum(), page);
+    }
 
     node->Serialize(page->Data(), dal_->GetMetaPtr()->GetPageSize());
 }
@@ -434,11 +507,17 @@ void Storage::PushLog() {
     std::unique_lock lock(mutex_);
 
     const auto& logs = log_storage_.GetLogs();
-    for (const auto& log : logs) {
+    std::unordered_set<std::string> used_keys;
+    for (auto log : std::ranges::reverse_view(logs)) {
+        if (used_keys.contains(LogStorage::ConvertToStr(log.GetValue()))) {
+            continue;
+        }
+        used_keys.emplace(LogStorage::ConvertToStr(log.GetKey()));
+
         if (log.GetCommand() == Log::Command::PUT) {
             PutInTree(log.GetKey(), log.GetValue());
-        } else (log.GetCommand() == Log::Command::REMOVE) {
-            PutInTree(log.GetKey());
+        } else {
+            RemoveInTree(log.GetKey());
         }
     }
     log_storage_.Clear();
@@ -449,8 +528,14 @@ void Storage::PushLogAsync() {
         PushLog();
     });
     // Thread is not joined, call is a non-blocking operation
+    thread.detach();
 }
 
 Storage::~Storage() {
     PushLog();
+}
+
+void Storage::PushTransactionLogs(const std::vector<Log> &logs) {
+    // Transactions logs should always be stored no matter logs are full or not
+    log_storage_.PushTransactionLogs(logs);
 }

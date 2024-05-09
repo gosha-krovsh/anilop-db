@@ -25,7 +25,7 @@ std::vector<byte> Item::GetKey() { return key_; }
 
 std::vector<byte> Item::GetValue() { return value_; }
 
-size_t Item::Serialize(byte* data, size_t max_volume) {
+size_t Item::Serialize(byte* data, size_t max_volume) const {
     size_t o_size = 2 * uint64_t_size + key_.size() + value_.size();
     if (max_volume < o_size) {
         throw dal_error::CorruptedBuffer("Buffer size is too low for serialisation.");

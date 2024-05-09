@@ -15,7 +15,8 @@ Log::Log(Log::Command command, const std::vector<byte> &key)
     assert(command_ == Command::REMOVE);
 }
 
-Log::Log() {
+Log::Log(Log::Command command) : command_(command) {
+    assert(command_ == Command::COMMIT);
 }
 
 size_t Log::Serialize(byte *data, size_t max_volume) const {
@@ -95,3 +96,5 @@ Log Log::readFromBuffer(byte *buffer, size_t max_size) {
     log.Deserialize(buffer, max_size);
     return log;
 }
+
+Log::Log() = default;

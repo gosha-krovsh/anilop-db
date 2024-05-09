@@ -4,9 +4,12 @@
 #include <cstring>
 #include <memory>
 #include <tuple>
+#include <shared_mutex>
 #include <mutex>
 
 #include "dal/dal.h"
+#include "dal/log_dal.h"
+#include "dal/memory_log_dal.h"
 #include "dal/node.h"
 #include "memory/type.h"
 #include "settings/settings.h"
@@ -22,11 +25,23 @@ class Storage {
     void Put(const std::vector<byte>& key, const std::vector<byte>& value);
     void Remove(const std::vector<byte>& key);
 
+    void PushTransactionLogs(const std::vector<Log>& logs);
+
+    /// @brief Restores saved state
+    void Restore();
+
    private:
+    /// @brief Clears saved state
+    void ClearState();
+
     // Tree functions
     std::optional<std::vector<byte>> FindInTree(const std::vector<byte>& key);
     void PutInTree(const std::vector<byte>& key, const std::vector<byte>& value);
     void RemoveInTree(const std::vector<byte>& key);
+    // Tree functions impls
+    std::optional<std::vector<byte>> FindInTreeImpl(const std::vector<byte>& key);
+    void PutInTreeImpl(const std::vector<byte>& key, const std::vector<byte>& value);
+    void RemoveInTreeImpl(const std::vector<byte>& key);
 
     // Memory workflow functions
     std::shared_ptr<Node> GetNode(uint64_t page_num);
@@ -69,10 +84,14 @@ class Storage {
     void PushLog();
     void PushLogAsync();
 
-    std::mutex mutex_;
+    std::shared_mutex mutex_;
 
     settings::UserSettings settings_;
+
     std::shared_ptr<DAL> dal_;
+    std::shared_ptr<LogDAL> log_dal_;
+    std::shared_ptr<MemoryLogDAL> memory_log_dal_;
+
     uint64_t root_;
 
     // Storage extension

@@ -2,7 +2,7 @@
 
 Node::Node() {}
 
-bool Node::IsLeaf() { return child_nodes_.size() == 0; }
+bool Node::IsLeaf() const { return child_nodes_.size() == 0; }
 
 void Node::SetPageNum(uint64_t page_num) {
     page_num_ = page_num;
@@ -20,14 +20,14 @@ std::vector<uint64_t>* Node::ChildNodesPtr() { return &child_nodes_; }
 
 std::vector<std::shared_ptr<Item>>* Node::ItemsPtr() { return &items_; }
 
-size_t Node::HeaderByteLength() { 
+size_t Node::HeaderByteLength() const {
     size_t length = 1 + 2;  // leaf_bit, len of pairs
     length += items_.size() * uint64_t_size;  // offsets
     length += child_nodes_.size() * uint64_t_size;  // child pointers
     return length;
 }
 
-size_t Node::ByteLength() {
+size_t Node::ByteLength() const {
     size_t length = HeaderByteLength();
     for (const auto& item : items_) {
         length += item->ByteLength();
@@ -35,7 +35,7 @@ size_t Node::ByteLength() {
     return length;
 }
 
-size_t Node::Serialize(byte* data, size_t max_volume) { 
+size_t Node::Serialize(byte* data, size_t max_volume) const {
     if (max_volume < ByteLength()) {
         throw dal_error::CorruptedBuffer("Buffer size is too low for serialisation."); 
     }
@@ -125,4 +125,9 @@ void Node::CheckPtrInterDeser(const char* left, const char* right) {
     if (right <= left) {
         throw dal_error::CorruptedBuffer("Buffer size is too low for deserialisation."); 
     }
+}
+
+bool Node::CanGiveElement() const {
+    // TODO(George) Fix this
+    return false;
 }

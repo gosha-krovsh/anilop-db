@@ -9,10 +9,20 @@
 #include "memory/memory.h"
 #include "exception/exception.h"
 
-class Meta : public ISerializable {
-   public:
-    Meta() = default;
+class IMeta : public ISerializable{
+public:
+    size_t Serialize(byte* data, size_t max_volume) const override;
+    size_t Deserialize(const byte* data, size_t max_volume) override;
 
+    virtual size_t GetSize() const { return GetMagicWord().size(); };
+
+protected:
+    virtual std::string GetMagicWord() const = 0;
+};
+
+class Meta : public IMeta {
+    using BaseT = IMeta;
+   public:
     size_t Serialize(byte* data, size_t max_volume) const override;
     size_t Deserialize(const byte* data, size_t max_volume) override;
 
@@ -24,11 +34,40 @@ class Meta : public ISerializable {
     uint64_t GetRootPage();
     void SetRootPage(uint64_t page);
 
-   private:
-    std::string magic_word = "ANILOPDB";
+protected:
+    std::string GetMagicWord() const override { return "ANILOPDB"; };
+
     uint64_t page_size_ = 0;
     uint64_t free_list_page_ = 0;
     uint64_t root_ = 0;
+};
+
+class LogMeta : public IMeta {
+protected:
+    std::string GetMagicWord() const override { return "ANILOPDBLOG"; }
+};
+
+class MemoryLogMeta : public IMeta {
+public:
+    uint64_t GetPageSize() const { return page_size_; };
+    void SetPageSize(uint64_t page_size) { page_size_ = page_size; }
+
+    uint64_t GetDataStartPage() const { return data_page_; };
+    void SetDataStartPage(uint64_t page) { data_page_ = page; }
+
+    uint64_t GetDirtyPage() const { return dirty_page_; }
+    void SetDirtyPage(uint64_t page) { dirty_page_ = page; }
+    uint64_t GetAllocatedPage() const { return allocated_page_; }
+    void SetAllocatedPage(uint64_t page) { allocated_page_ = page; }
+
+protected:
+    std::string GetMagicWord() const override { return "ANILOPDBMLOG"; }
+
+private:
+    uint64_t page_size_ = 0;
+    uint64_t dirty_page_ = 0;
+    uint64_t allocated_page_ = 0;
+    uint64_t data_page_ = 0;
 };
 
 #endif  // META_H_

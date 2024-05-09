@@ -40,13 +40,29 @@ add_executable(Anilop
     dal/meta.h
     dal/meta.cpp
     dal/serializable.h
+    dal/log.cpp
+    dal/log.h
 
     storage/storage.h
     storage/storage.cpp
     storage/log_storage.h
     storage/log_storage.cpp
-        dal/log.cpp
-        dal/log.h
+
+        public/Table.cpp
+        public/Table.h
+        public/Transaction.cpp
+        public/Transaction.h
+        public/type.h
+        public/Settings.h
+        storage/TransactionImpl.cpp
+        storage/TransactionImpl.h
+        dal/log_dal.cpp
+        dal/log_dal.h
+        dal/memory_log_dal.cpp
+        dal/memory_log_dal.h
+        dal/num_list.cpp
+        dal/num_list.h
+        memory/type.cpp
 )
 
 enable_testing()

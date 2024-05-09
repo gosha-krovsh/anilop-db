@@ -3,15 +3,13 @@
 #include <memory>
 
 DAL::DAL(const std::string& path,
-         const std::string& log_path,
          const settings::UserSettings& user_settings) :
-      file_(path, std::ios::binary),
-      log_file_(log_path, std::ios::binary),
+      file_(),
       meta_(new Meta()),
       free_list_(new FreeList(settings::kMaxPage)) {
     // Check file existence and read metadata if needed
     bool file_exist = std::filesystem::exists(path);
-    file_.open(path);
+    file_.open(path, std::ios::binary);
 
     if (file_exist) {
         readMeta();
@@ -33,6 +31,9 @@ std::shared_ptr<Page> DAL::AllocateEmptyPage() {
 }
 
 std::shared_ptr<Page> DAL::ReadPage(uint64_t page_num) {
+    if (!file_.is_open())
+        throw dal_error::FileError("File is closed");
+
     std::shared_ptr<Page> page = AllocateEmptyPage();
     // Page offset in file
     uint64_t offset = page_num * meta_->GetPageSize();
@@ -50,6 +51,9 @@ std::shared_ptr<Page> DAL::ReadPage(uint64_t page_num) {
 }
 
 void DAL::WritePage(const std::shared_ptr<Page>& page) {
+    if (!file_.is_open())
+        throw dal_error::FileError("File is closed");
+
     uint64_t offset = page->GetPageNum() * meta_->GetPageSize();
     // Write page into file
     file_.seekp(offset);
@@ -65,17 +69,34 @@ void DAL::WritePage(const std::shared_ptr<Page>& page) {
     if (file_.fail()) {
         throw dal_error::FileError("File flush failed.");
     }
+    // Update freelist status
+    writeFreeList();
 }
 
 uint64_t DAL::GetNextPage() {
-    return free_list_->GetNextPage(); 
+    if (!file_.is_open())
+        throw dal_error::FileError("File is closed");
+
+    auto next_page = free_list_->GetNextPage();
+    return next_page;
 }
 
 void DAL::ReleasePage(uint64_t page_num) {
+    if (!file_.is_open())
+        throw dal_error::FileError("File is closed");
+
     free_list_->ReleasePage(page_num);
+    // Update freelist status
+    writeFreeList();
 }
 
 void DAL::close() {
+    if (!file_.is_open())
+        throw dal_error::FileError("File is closed");
+
+    writeMeta();
+    writeFreeList();
+
     file_.close();
     if (file_.fail()) {
         throw dal_error::FileError("File close failed.");
@@ -114,35 +135,6 @@ void DAL::readFreeList() {
     free_list_->Deserialize(page->Data(), meta_->GetPageSize());
 }
 
-bool DAL::canWriteLog() {
-    return free_list_->HasFreePages();
-}
-
-std::vector<byte> DAL::ReadLogBuffer() {
-    auto size = log_file_.tellg();
-    if (size == 0) {
-        return {};
-    }
-    std::vector<byte> buffer(size);
-    log_file_.read(buffer.data(), size);
-    return buffer;
-}
-
-void DAL::ClearLog() {
-    log_file_.clear();
-}
-
-void DAL::WriteLog(const Log &log) {
-    std::vector<byte> data(log.GetLogSize());
-    log.Serialize(data.data(), data.size());
-
-    log_file_.write(data.data(), data.size());
-    if (log_file_.fail()) {
-        throw dal_error::FileError("Log file write failed.");
-    }
-    // Flush is important to keep data up to date
-    log_file_.flush();
-    if (log_file_.fail()) {
-        throw dal_error::FileError("Log file flush failed.");
-    }
+bool DAL::CanWrite() {
+    return file_.is_open() && free_list_->HasFreePages();
 }

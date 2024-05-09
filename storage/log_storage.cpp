@@ -1,8 +1,8 @@
 #include "log_storage.h"
 
-LogStorage::LogStorage(std::shared_ptr<DAL> dal, const settings::UserSettings &settings)
-    : settings_(settings), dal_(std::move(dal)) {
-    auto log_buffer = dal_->ReadLogBuffer();
+LogStorage::LogStorage(std::shared_ptr<DAL> dal, std::shared_ptr<LogDAL> log_dal, const settings::UserSettings &settings)
+    : settings_(settings), dal_(std::move(dal)), log_dal_(std::move(log_dal)) {
+    auto log_buffer = log_dal_->ReadLogBuffer();
     auto log_buffer_ptr = log_buffer.data();
     uint64_t max_buffer_size = log_buffer.size();
     while (!log_buffer.empty()) {
@@ -10,9 +10,7 @@ LogStorage::LogStorage(std::shared_ptr<DAL> dal, const settings::UserSettings &s
         log_buffer_ptr += log.GetLogSize();
         max_buffer_size -= log.GetLogSize();
 
-        auto str_key = ConvertToStr(log.GetKey());
-        memory_log_.push_back(std::move(log));
-        key_to_memory_log_.emplace(str_key, --memory_log_.end());
+        WriteLog(log);
     }
 }
 
@@ -20,22 +18,20 @@ std::optional<std::vector<byte>> LogStorage::Find(const std::vector<byte> &key) 
     auto str_key = ConvertToStr(key);
     auto map_it = key_to_memory_log_.find(str_key);
     if (map_it != key_to_memory_log_.end()) {
-        return std::make_optional(map_it->second->GetValue());
+        if (map_it->second.back()->GetCommand() != Log::Command::REMOVE)
+            return std::make_optional(map_it->second.back()->GetValue());
     }
     return std::nullopt;
 }
 
 bool LogStorage::Put(const std::vector<byte>& key, const std::vector<byte>& value) {
-    if (!dal_->canWriteLog() || memory_log_.size() >= settings_.max_log_size) {
+    if (!dal_->CanWrite() || memory_log_.size() >= settings_.max_log_size) {
         return false;
     }
     Log log(Log::Command::PUT, key, value);
     auto str_key = ConvertToStr(key);
 
-    dal_->WriteLog(log);
-    memory_log_.emplace_back(std::move(log));
-    key_to_memory_log_.emplace(str_key, --memory_log_.end());
-
+    WriteLog(log);
     return true;
 }
 
@@ -43,10 +39,7 @@ bool LogStorage::Remove(const std::vector<byte> &key) {
     Log log(Log::Command::REMOVE, key);
     auto str_key = ConvertToStr(key);
 
-    dal_->WriteLog(log);
-    memory_log_.emplace_back(std::move(log));
-    key_to_memory_log_.emplace(str_key, --memory_log_.end());
-
+    WriteLog(log);
     return true;
 }
 
@@ -62,7 +55,7 @@ std::vector<byte> LogStorage::ConvertFromStr(const std::string &data) {
     if (data.empty()) {
         return {};
     }
-    return { data.begin(), data.end() - 1 };
+    return { data.begin(), std::prev(data.end()) };
 }
 
 std::vector<Log> &LogStorage::GetLogs() {
@@ -77,5 +70,23 @@ void LogStorage::Clear() {
     memory_log_.clear();
     key_to_memory_log_.clear();
 
-    dal_->ClearLogs();
+    log_dal_->ClearLogs();
+}
+
+void LogStorage::PushTransactionLogs(const std::vector<Log> &logs) {
+    for (const auto& log : logs)
+        WriteLog(log);
+
+    WriteLog({ Log::Command::COMMIT });
+}
+
+void LogStorage::WriteLog(const Log &log) {
+    log_dal_->WriteLog(log);
+    memory_log_.push_back(log);
+
+    if (log.GetCommand() == Log::Command::COMMIT)
+        return;
+
+    auto str_key = ConvertToStr(log.GetKey());
+    key_to_memory_log_[str_key].push_back(--memory_log_.end());
 }

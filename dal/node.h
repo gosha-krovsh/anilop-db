@@ -17,8 +17,8 @@ class Node : public ISerializable {
    public:
     Node();
 
-    bool IsLeaf();
-    bool CanGiveElement();
+    bool IsLeaf() const;
+    bool CanGiveElement() const;
 
     void SetPageNum(uint64_t page_num);
     uint64_t GetPageNum() const;
@@ -28,10 +28,10 @@ class Node : public ISerializable {
     std::vector<uint64_t>* ChildNodesPtr();
     std::vector<std::shared_ptr<Item>>* ItemsPtr();
 
-    size_t HeaderByteLength();
-    size_t ByteLength();
+    size_t HeaderByteLength() const;
+    size_t ByteLength() const;
 
-    size_t Serialize(byte* data, size_t max_volume) override;
+    size_t Serialize(byte* data, size_t max_volume) const override;
     size_t Deserialize(const byte* data, size_t max_volume) override;
 
    private:

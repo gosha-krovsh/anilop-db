@@ -23,6 +23,7 @@ class FreeList : public ISerializable {
 
     uint64_t GetNextPage();
     void ReleasePage(uint64_t page_num);
+    void ReleaseAllPages(uint64_t start_page_num);
 
     bool HasFreePages();
 

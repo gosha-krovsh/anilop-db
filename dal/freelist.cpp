@@ -1,5 +1,7 @@
 #include "freelist.h"
 
+#include <numeric>
+
 FreeList::FreeList() : FreeList(0) {}
 
 FreeList::FreeList(uint64_t max_page)
@@ -79,6 +81,13 @@ void FreeList::ReleasePage(uint64_t page_num) {
     released_pages_.push_back(page_num);
 }
 
+void FreeList::ReleaseAllPages(uint64_t start_page_num) {
+    size_t new_size = max_page_ - start_page_num;
+    released_pages_.resize(new_size);
+
+    std::iota(released_pages_.begin(), released_pages_.end(), start_page_num);
+}
+
 bool FreeList::HasFreePages() {
-    return current_max_page_ < max_page_ || released_pages_.size() > 0;
+    return current_max_page_ < max_page_ || !released_pages_.empty();
 }

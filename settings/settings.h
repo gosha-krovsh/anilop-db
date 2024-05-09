@@ -6,7 +6,7 @@
 
 namespace settings {
 
-extern size_t kMaxPage;
+extern const size_t kMaxPage;
 
 struct UserSettings {
     size_t page_size = 4096;

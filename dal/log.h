@@ -11,11 +11,13 @@ class Log : public ISerializable {
 public:
     enum class Command : byte {
         PUT,
-        REMOVE
+        REMOVE,
+        COMMIT
     };
 
     Log(Command command, const std::vector<byte>& key, const std::vector<byte>& value);
     Log(Command command, const std::vector<byte>& key);
+    Log(Command command);
 
     static Log readFromBuffer(byte* buffer, size_t max_size);
 

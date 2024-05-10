@@ -3,6 +3,7 @@
 
 #include <optional>
 #include <unordered_map>
+#include <list>
 #include <cstring>
 #include <memory>
 #include <tuple>
@@ -23,8 +24,8 @@ public:
 
     void PushTransactionLogs(const std::vector<Log>& logs);
 
-    std::vector<Log>& GetLogs();
-    const std::vector<Log>& GetLogs() const;
+    std::list<Log>& GetLogs();
+    const std::list<Log>& GetLogs() const;
     size_t Size();
 
     void Clear();
@@ -34,9 +35,13 @@ public:
 
 private:
     void WriteLog(const Log& log);
+    void WriteLogToMemory(const Log& log);
 
-    std::vector<Log> memory_log_;
-    std::unordered_map<std::string, std::vector<std::vector<Log>::iterator>> key_to_memory_log_;
+    void WriteMeta();
+    void ReadMeta();
+
+    std::list<Log> memory_log_;
+    std::unordered_map<std::string, std::vector<std::list<Log>::iterator>> key_to_memory_log_;
 
     settings::UserSettings settings_;
     std::shared_ptr<DAL> dal_;

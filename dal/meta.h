@@ -42,8 +42,22 @@ protected:
 };
 
 class LogMeta : public IMeta {
+    using BaseT = IMeta;
+
+public:
+    size_t Serialize(byte* data, size_t max_volume) const override;
+    size_t Deserialize(const byte* data, size_t max_volume) override;
+
+    size_t GetSize() const override;
+
+    uint64_t GetDataEndOffset() { return data_end_offset_; };
+    void SetDataEndOffset(uint64_t data_end_offset) { data_end_offset_ = data_end_offset; };
+
 protected:
     std::string GetMagicWord() const override { return "ANILOPDBLOG"; }
+
+private:
+    uint64_t data_end_offset_ = 0;
 };
 
 class MemoryLogMeta : public IMeta {

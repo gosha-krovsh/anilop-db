@@ -12,6 +12,7 @@ LogDAL::LogDAL(const std::string &path, const settings::UserSettings &)
     if (file_exist) {
         ReadMeta();
     } else {
+        meta_->SetDataEndOffset(meta_->GetSize());
         WriteMeta();
     }
 }
@@ -44,7 +45,7 @@ void LogDAL::WriteLog(const Log &log) {
     std::vector<byte> data(log.GetByteLength());
     log.Serialize(data.data(), data.size());
 
-    file_.seekp(meta_->GetSize(), file_.beg);
+    file_.seekp(meta_->GetDataEndOffset(), file_.beg);
     file_.write(data.data(), data.size());
     if (file_.fail()) {
         throw dal_error::FileError("Log file write failed.");
@@ -54,6 +55,10 @@ void LogDAL::WriteLog(const Log &log) {
     if (file_.fail()) {
         throw dal_error::FileError("Log file flush failed.");
     }
+
+    // Update offset
+    meta_->SetDataEndOffset(meta_->GetDataEndOffset() + log.GetByteLength());
+    WriteMeta();
 }
 
 void LogDAL::ClearLogs() {

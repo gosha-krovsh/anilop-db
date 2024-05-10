@@ -74,6 +74,7 @@ add_executable(
     DALTest
     test/dal_help_test.cpp
     test/dal_test.cpp
+    test/log_storage_test.cpp
 
     settings/settings.h
     settings/settings.cpp
@@ -107,6 +108,9 @@ add_executable(
     dal/memory_log_dal.h
     dal/num_list.cpp
     dal/num_list.h
+
+    storage/log_storage.h
+    storage/log_storage.cpp
 )
 target_link_libraries(
     DALTest

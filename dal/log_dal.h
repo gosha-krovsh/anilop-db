@@ -34,6 +34,7 @@ private:
     void ReadMeta();
 
     std::fstream file_;
+    uint64_t current_data_offset_;
 
     const uint64_t meta_offset_ = 0;
     std::shared_ptr<LogMeta> meta_;

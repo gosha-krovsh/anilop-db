@@ -75,6 +75,38 @@ size_t Meta::GetSize() const {
     return base_size + (3 * uint64_t_size);
 }
 
+
+size_t LogMeta::Serialize(byte *data, size_t max_volume) const {
+    size_t o_base_size = BaseT::Serialize(data, max_volume);
+    data += o_base_size;
+
+    size_t o_size = uint64_t_size;
+    if (max_volume < o_size) {
+        throw dal_error::CorruptedBuffer("Buffer is too low for serialization.");
+    }
+    memory::uint64_to_bytes(data, data_end_offset_);
+
+    return o_base_size + o_size;
+}
+
+size_t LogMeta::Deserialize(const byte *data, size_t max_volume) {
+    size_t r_base_size = BaseT::Deserialize(data, max_volume);
+    data += r_base_size;
+
+    size_t r_size = uint64_t_size;
+    if (max_volume < r_size) {
+        throw dal_error::CorruptedBuffer("Buffer is too low for deserialization.");
+    }
+    data_end_offset_ = memory::bytes_to_uint64(data);
+
+    return r_base_size + r_size;
+}
+
+size_t LogMeta::GetSize() const {
+    auto base_size = BaseT::GetSize();
+    return base_size + uint64_t_size;
+}
+
 size_t MemoryLogMeta::Serialize(byte *data, size_t max_volume) const {
     size_t o_base_size = BaseT::Serialize(data, max_volume);
     data += o_base_size;

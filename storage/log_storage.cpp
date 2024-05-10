@@ -4,13 +4,13 @@ LogStorage::LogStorage(std::shared_ptr<DAL> dal, std::shared_ptr<LogDAL> log_dal
     : settings_(settings), dal_(std::move(dal)), log_dal_(std::move(log_dal)) {
     auto log_buffer = log_dal_->ReadLogBuffer();
     auto log_buffer_ptr = log_buffer.data();
-    uint64_t max_buffer_size = log_buffer.size();
-    while (!log_buffer.empty()) {
-        auto log = Log::readFromBuffer(log_buffer_ptr, max_buffer_size);
-        log_buffer_ptr += log.GetLogSize();
-        max_buffer_size -= log.GetLogSize();
+    uint64_t buffer_size_left = log_buffer.size();
+    while (buffer_size_left > 0) {
+        auto log = Log::readFromBuffer(log_buffer_ptr, buffer_size_left);
+        log_buffer_ptr += log.GetByteLength();
+        buffer_size_left -= log.GetByteLength();
 
-        WriteLog(log);
+        WriteLogToMemory(log);
     }
 }
 
@@ -18,7 +18,8 @@ std::optional<std::vector<byte>> LogStorage::Find(const std::vector<byte> &key) 
     auto str_key = ConvertToStr(key);
     auto map_it = key_to_memory_log_.find(str_key);
     if (map_it != key_to_memory_log_.end()) {
-        if (map_it->second.back()->GetCommand() != Log::Command::REMOVE)
+        const auto& log = map_it->second.back();
+        if (log->GetCommand() != Log::Command::REMOVE)
             return std::make_optional(map_it->second.back()->GetValue());
     }
     return std::nullopt;
@@ -58,11 +59,11 @@ std::vector<byte> LogStorage::ConvertFromStr(const std::string &data) {
     return { data.begin(), std::prev(data.end()) };
 }
 
-std::vector<Log> &LogStorage::GetLogs() {
+std::list<Log> &LogStorage::GetLogs() {
     return memory_log_;
 }
 
-const std::vector<Log> &LogStorage::GetLogs() const {
+const std::list<Log> &LogStorage::GetLogs() const {
     return memory_log_;
 }
 
@@ -82,11 +83,15 @@ void LogStorage::PushTransactionLogs(const std::vector<Log> &logs) {
 
 void LogStorage::WriteLog(const Log &log) {
     log_dal_->WriteLog(log);
+    WriteLogToMemory(log);
+}
+
+void LogStorage::WriteLogToMemory(const Log &log) {
     memory_log_.push_back(log);
 
     if (log.GetCommand() == Log::Command::COMMIT)
         return;
 
     auto str_key = ConvertToStr(log.GetKey());
-    key_to_memory_log_[str_key].push_back(--memory_log_.end());
+    key_to_memory_log_[str_key].push_back(std::prev(memory_log_.end()));
 }

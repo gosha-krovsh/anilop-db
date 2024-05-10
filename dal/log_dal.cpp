@@ -74,7 +74,11 @@ void LogDAL::Close() {
     }
 }
 
-LogDAL::~LogDAL() { Close(); }
+LogDAL::~LogDAL() {
+    if (file_.is_open()) {
+        Close();
+    }
+}
 
 void LogDAL::WriteMeta() {
     file_.seekp(meta_offset_, file_.beg);

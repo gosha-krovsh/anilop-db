@@ -48,28 +48,65 @@ add_executable(Anilop
     storage/log_storage.h
     storage/log_storage.cpp
 
-        public/Table.cpp
-        public/Table.h
-        public/Transaction.cpp
-        public/Transaction.h
-        public/type.h
-        public/Settings.h
-        storage/TransactionImpl.cpp
-        storage/TransactionImpl.h
-        dal/log_dal.cpp
-        dal/log_dal.h
-        dal/memory_log_dal.cpp
-        dal/memory_log_dal.h
-        dal/num_list.cpp
-        dal/num_list.h
-        memory/type.cpp
+    public/Table.cpp
+    public/Table.h
+    public/Transaction.cpp
+    public/Transaction.h
+    public/type.h
+    public/Settings.h
+
+    storage/TransactionImpl.cpp
+    storage/TransactionImpl.h
+
+    dal/log_dal.cpp
+    dal/log_dal.h
+    dal/memory_log_dal.cpp
+    dal/memory_log_dal.h
+    dal/num_list.cpp
+    dal/num_list.h
+
+    memory/type.cpp
 )
 
 enable_testing()
 
 add_executable(
     DALTest
+    test/dal_help_test.cpp
     test/dal_test.cpp
+
+    settings/settings.h
+    settings/settings.cpp
+
+    exception/exception.h
+    exception/exception.cpp
+
+    memory/type.h
+    memory/type.cpp
+    memory/memory.h
+    memory/memory.cpp
+
+    dal/dal.h
+    dal/dal.cpp
+    dal/page.h
+    dal/page.cpp
+    dal/item.h
+    dal/item.cpp
+    dal/node.h
+    dal/node.cpp
+    dal/freelist.h
+    dal/freelist.cpp
+    dal/meta.h
+    dal/meta.cpp
+    dal/serializable.h
+    dal/log.cpp
+    dal/log.h
+    dal/log_dal.cpp
+    dal/log_dal.h
+    dal/memory_log_dal.cpp
+    dal/memory_log_dal.h
+    dal/num_list.cpp
+    dal/num_list.h
 )
 target_link_libraries(
     DALTest

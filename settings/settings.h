@@ -7,9 +7,9 @@
 namespace settings {
 
 extern const size_t kMaxPage;
+extern const size_t kPageSize;
 
 struct UserSettings {
-    size_t page_size = 4096;
     size_t max_log_size = 100;
     double min_fill_percent = 0.2;
     double max_fill_percent = 0.95;

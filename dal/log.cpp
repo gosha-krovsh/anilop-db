@@ -87,8 +87,8 @@ std::vector<byte>& Log::GetValue() {
     return value_;
 }
 
-uint64_t Log::GetLogSize() const {
-    return 2 + key_.size() + value_.size();
+size_t Log::GetByteLength() const {
+    return 1 + 2 * uint64_t_size + key_.size() + value_.size();
 }
 
 Log Log::readFromBuffer(byte *buffer, size_t max_size) {

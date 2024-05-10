@@ -18,9 +18,6 @@ class FreeList : public ISerializable {
     size_t Serialize(byte* data, size_t max_volume) const override;
     size_t Deserialize(const byte* data, size_t max_volume) override;
 
-    uint64_t GetMaxPage() const;
-    void SetMaxPage(uint64_t max_page);
-
     uint64_t GetNextPage();
     void ReleasePage(uint64_t page_num);
     void ReleaseAllPages(uint64_t start_page_num);

@@ -1,15 +1,20 @@
 #include "memory_log_dal.h"
 
-MemoryLogDAL::MemoryLogDAL(const std::string &path, const settings::UserSettings& user_settings) {
+MemoryLogDAL::MemoryLogDAL(const std::string &path, const settings::UserSettings&)
+    : file_()
+    , meta_(new MemoryLogMeta()) {
     bool file_exist = std::filesystem::exists(path);
-    file_.open(path, std::ios::binary);
+    if (file_exist) {
+        file_.open(path,  std::fstream::in | std::fstream::out);
+    } else {
+        file_.open(path,  std::fstream::in | std::fstream::out | std::fstream::trunc);
+    }
 
     if (file_exist) {
         ReadMeta();
         ReadAllPages();
     } else {
         // Set up meta
-        meta_->SetPageSize(user_settings.page_size);
         meta_->SetDirtyPage(1);
         meta_->SetAllocatedPage(2);
         meta_->SetDataStartPage(3);
@@ -47,7 +52,7 @@ std::vector<std::pair<uint64_t, std::shared_ptr<Page>>> MemoryLogDAL::GetSavedPa
     if (!file_.is_open())
         throw dal_error::FileError("File is closed");
 
-    std::vector<std::pair<uint64_t, std::shared_ptr<Page>>> result(dirty_pages_.GetDataPtr()->size());
+    std::vector<std::pair<uint64_t, std::shared_ptr<Page>>> result;
 
     for (size_t i = 0; i < dirty_pages_.GetDataPtr()->size(); ++i) {
         auto page_num = meta_->GetDataStartPage() + i;
@@ -84,23 +89,25 @@ void MemoryLogDAL::Close() {
 }
 
 MemoryLogDAL::~MemoryLogDAL() {
-    Close();
+    if (file_.is_open()) {
+        Close();
+    }
 }
 
 std::shared_ptr<Page> MemoryLogDAL::AllocateEmptyPage() {
-    return std::make_shared<Page>(meta_->GetPageSize());
+    return std::make_shared<Page>(settings::kPageSize);
 }
 
 std::shared_ptr<Page> MemoryLogDAL::ReadPage(uint64_t page_num) {
     std::shared_ptr<Page> page = AllocateEmptyPage();
     // Page offset in file
-    uint64_t offset = page_num * meta_->GetPageSize();
+    uint64_t offset = page_num * settings::kPageSize;
     // Retrieve page from file
     file_.seekg(offset);
     if (file_.fail()) {
         throw dal_error::FileError("File is corrupted.");
     }
-    file_.readsome(page->Data(), meta_->GetPageSize());
+    file_.readsome(page->Data(), settings::kPageSize);
     if (file_.fail()) {
         throw dal_error::FileError("File read failed.");
     }
@@ -109,13 +116,13 @@ std::shared_ptr<Page> MemoryLogDAL::ReadPage(uint64_t page_num) {
 }
 
 void MemoryLogDAL::WritePage(const std::shared_ptr<Page> &page) {
-    uint64_t offset = page->GetPageNum() * meta_->GetPageSize();
+    uint64_t offset = page->GetPageNum() * settings::kPageSize;
     // Write page into file
     file_.seekp(offset);
     if (file_.fail()) {
         throw dal_error::FileError("File is corrupted.");
     }
-    file_.write(page->Data(), meta_->GetPageSize());
+    file_.write(page->Data(), settings::kPageSize);
     if (file_.fail()) {
         throw dal_error::FileError("File write failed.");
     }
@@ -130,23 +137,20 @@ void MemoryLogDAL::WriteMeta() {
     std::shared_ptr<Page> page = AllocateEmptyPage();
     page->SetPageNum(meta_page_num_);
 
-    meta_->Serialize(page->Data(), meta_->GetPageSize());
+    meta_->Serialize(page->Data(), settings::kPageSize);
     WritePage(page);
 }
 
 void MemoryLogDAL::ReadMeta() {
-    std::shared_ptr<Page> page = AllocateEmptyPage();
-    page->SetPageNum(meta_page_num_);
-
-    meta_->Serialize(page->Data(), meta_->GetPageSize());
-    WritePage(page);
+    std::shared_ptr<Page> page = ReadPage(meta_page_num_);
+    meta_->Deserialize(page->Data(), settings::kPageSize);
 }
 
 void MemoryLogDAL::WriteDirtyPages() {
     std::shared_ptr<Page> page = AllocateEmptyPage();
     page->SetPageNum(meta_->GetDirtyPage());
 
-    dirty_pages_.Serialize(page->Data(), meta_->GetPageSize());
+    dirty_pages_.Serialize(page->Data(), settings::kPageSize);
     WritePage(page);
 }
 
@@ -154,7 +158,7 @@ void MemoryLogDAL::WriteNewPages() {
     std::shared_ptr<Page> page = AllocateEmptyPage();
     page->SetPageNum(meta_->GetAllocatedPage());
 
-    new_pages_.Serialize(page->Data(), meta_->GetPageSize());
+    new_pages_.Serialize(page->Data(), settings::kPageSize);
     WritePage(page);
 }
 
@@ -162,8 +166,8 @@ void MemoryLogDAL::ReadAllPages() {
     auto dirty_page = ReadPage(meta_->GetDirtyPage());
     auto new_page = ReadPage(meta_->GetAllocatedPage());
 
-    dirty_pages_.Deserialize(dirty_page->Data(), meta_->GetPageSize());
-    new_pages_.Deserialize(new_page->Data(), meta_->GetPageSize());
+    dirty_pages_.Deserialize(dirty_page->Data(), settings::kPageSize);
+    new_pages_.Deserialize(new_page->Data(), settings::kPageSize);
 }
 
 

@@ -3,7 +3,11 @@
 LogDAL::LogDAL(const std::string &path, const settings::UserSettings &)
     : meta_(new LogMeta()) {
     bool file_exist = std::filesystem::exists(path);
-    file_.open(path, std::ios::binary);
+    if (file_exist) {
+        file_.open(path,  std::fstream::in | std::fstream::out);
+    } else {
+        file_.open(path,  std::fstream::in | std::fstream::out | std::fstream::trunc);
+    }
 
     if (file_exist) {
         ReadMeta();
@@ -37,7 +41,7 @@ void LogDAL::WriteLog(const Log &log) {
     if (!file_.is_open())
         throw dal_error::FileError("File is closed");
 
-    std::vector<byte> data(log.GetLogSize());
+    std::vector<byte> data(log.GetByteLength());
     log.Serialize(data.data(), data.size());
 
     file_.seekp(meta_->GetSize(), file_.beg);
@@ -66,7 +70,7 @@ void LogDAL::Close() {
 
     file_.close();
     if (file_.fail()) {
-        throw dal_error::FileError("File close failed.");
+        throw dal_error::FileError("File Close failed.");
     }
 }
 

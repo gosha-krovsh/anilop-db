@@ -19,6 +19,8 @@ public:
     std::vector<uint64_t>* GetDataPtr();
     const std::vector<uint64_t>* GetDataPtr() const;
 
+    size_t GetByteLength() const;
+
     void Clear();
 
 private:

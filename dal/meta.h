@@ -14,7 +14,7 @@ public:
     size_t Serialize(byte* data, size_t max_volume) const override;
     size_t Deserialize(const byte* data, size_t max_volume) override;
 
-    virtual size_t GetSize() const { return GetMagicWord().size(); };
+    virtual size_t GetSize() const { return GetMagicWord().size() + 1; };
 
 protected:
     virtual std::string GetMagicWord() const = 0;
@@ -22,12 +22,12 @@ protected:
 
 class Meta : public IMeta {
     using BaseT = IMeta;
+
    public:
     size_t Serialize(byte* data, size_t max_volume) const override;
     size_t Deserialize(const byte* data, size_t max_volume) override;
 
-    uint64_t GetPageSize();
-    void SetPageSize(uint64_t page_size);
+    size_t GetSize() const override;
 
     uint64_t GetFreeListPage();
     void SetFreeListPage(uint64_t page);
@@ -37,7 +37,6 @@ class Meta : public IMeta {
 protected:
     std::string GetMagicWord() const override { return "ANILOPDB"; };
 
-    uint64_t page_size_ = 0;
     uint64_t free_list_page_ = 0;
     uint64_t root_ = 0;
 };
@@ -48,9 +47,13 @@ protected:
 };
 
 class MemoryLogMeta : public IMeta {
+    using BaseT = IMeta;
+
 public:
-    uint64_t GetPageSize() const { return page_size_; };
-    void SetPageSize(uint64_t page_size) { page_size_ = page_size; }
+    size_t Serialize(byte* data, size_t max_volume) const override;
+    size_t Deserialize(const byte* data, size_t max_volume) override;
+
+    size_t GetSize() const override;
 
     uint64_t GetDataStartPage() const { return data_page_; };
     void SetDataStartPage(uint64_t page) { data_page_ = page; }
@@ -64,7 +67,6 @@ protected:
     std::string GetMagicWord() const override { return "ANILOPDBMLOG"; }
 
 private:
-    uint64_t page_size_ = 0;
     uint64_t dirty_page_ = 0;
     uint64_t allocated_page_ = 0;
     uint64_t data_page_ = 0;

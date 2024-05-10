@@ -46,9 +46,11 @@ size_t Node::Serialize(byte* data, size_t max_volume) const {
     }
     data[0] = leaf_bit;
     data += 1;
+    max_volume -= 1;
     // Serialize len of key-value pairs
     memory::uint16_to_bytes(data, static_cast<uint16_t>(items_.size()));
     data += 2;
+    max_volume -= 2;
     // Serialize header and item footer
     char* left_ptr = data;
     char* right_ptr = data + max_volume;
@@ -122,12 +124,7 @@ size_t Node::Deserialize(const byte* data, size_t max_volume) {
 }
 
 void Node::CheckPtrInterDeser(const char* left, const char* right) {
-    if (right <= left) {
-        throw dal_error::CorruptedBuffer("Buffer size is too low for deserialisation."); 
+    if (right < left) {
+        throw dal_error::CorruptedBuffer("Buffer size is too low for deserialization.");
     }
-}
-
-bool Node::CanGiveElement() const {
-    // TODO(George) Fix this
-    return false;
 }

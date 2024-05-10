@@ -18,7 +18,6 @@ class Node : public ISerializable {
     Node();
 
     bool IsLeaf() const;
-    bool CanGiveElement() const;
 
     void SetPageNum(uint64_t page_num);
     uint64_t GetPageNum() const;

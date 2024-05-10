@@ -55,14 +55,6 @@ size_t FreeList::Deserialize(const byte* data, size_t max_volume) {
     return r_size + released_pages_size * uint64_t_size;
 }
 
-uint64_t FreeList::GetMaxPage() const {
-    return max_page_; 
-}
-
-void FreeList::SetMaxPage(uint64_t max_page) {
-    max_page_ = max_page;
-}
-
 uint64_t FreeList::GetNextPage() {
     if (!released_pages_.empty()) {
         uint64_t page_num = released_pages_.back();
@@ -70,7 +62,7 @@ uint64_t FreeList::GetNextPage() {
 
         return page_num;
     } else if (current_max_page_ == max_page_) {
-        // TODO(George) Throw new exception here
+        throw dal_error::FileError("Low memory. Unable to allocate more data");
     }
 
     ++current_max_page_;

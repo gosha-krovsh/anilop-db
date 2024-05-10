@@ -32,7 +32,7 @@ public:
 
   bool CanWrite();
 
-  void close();
+  void Close();
   ~DAL();
 
 private:
@@ -43,13 +43,13 @@ private:
   void writeFreeList();
 
   std::fstream file_;
-  std::fstream log_file_;
-  std::fstream memory_log_file_;
 
   const uint64_t meta_page_num_ = 0;
   std::shared_ptr<MemoryLogMeta> memory_log_meta_;
   std::shared_ptr<Meta> meta_;
   std::shared_ptr<FreeList> free_list_;
+
+  std::mutex mutex_;
 };
 
 #endif  // DAL_H_

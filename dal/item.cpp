@@ -60,8 +60,8 @@ size_t Item::Deserialize(const byte* data, size_t max_volume) {
         throw dal_error::CorruptedBuffer(
             "Buffer size is too low for deserialisation.");
     }
-    key_.reserve(key_size);
-    value_.reserve(value_size);
+    key_.resize(key_size);
+    value_.resize(value_size);
 
     std::memcpy(key_.data(), data, key_size);
     data += key_size;

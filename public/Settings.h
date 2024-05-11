@@ -3,9 +3,12 @@
 
 #include "memory/type.h"
 
-struct Settings {
-    size_t max_log_size = 100;
-};
+namespace AnilopDB {
 
+    struct Settings {
+        size_t max_log_size = 100;
+    };
+
+}
 
 #endif //ANILOP_SETTINGS_H

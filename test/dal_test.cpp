@@ -188,9 +188,10 @@ TEST(MemoryLogDAL, OpenClose) {
 TEST_F(EmptyMemoryLogDalTest, Workflow) {
     {
         auto page = dal_->AllocateEmptyPage();
+        page->SetPageNum(10);
         page->Data()[0] = '#';
 
-        ASSERT_NO_THROW(dal_->SavePage(10, page));
+        ASSERT_NO_THROW(dal_->SavePage(page));
         ASSERT_NO_THROW(dal_->SavePageAllocation(11));
     }
     {

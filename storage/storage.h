@@ -46,8 +46,9 @@ class Storage {
     // Memory workflow functions
     std::shared_ptr<Node> GetNode(uint64_t page_num);
     std::vector<std::shared_ptr<Node>> GetNodes(const std::vector<uint64_t>& page_nums);
-    void WriteNode(const std::shared_ptr<Node>& node);
-    void DeleteNode(uint64_t page_num);
+    void WriteNode(const std::shared_ptr<Node>& node, bool is_new);
+    /// @warning Forbidden to change state of node, before delete
+    void DeleteNode(const std::shared_ptr<Node>& node);
     // Threshold calls
     double MaxThreshhold();
     double MinThreshhold();
@@ -84,12 +85,15 @@ class Storage {
     void PushLog();
     void PushLogAsync();
 
+    void UpdateSaveProcess();
+
     std::shared_mutex mutex_;
 
     settings::UserSettings settings_;
 
     std::shared_ptr<DAL> dal_;
     std::shared_ptr<LogDAL> log_dal_;
+    bool save_started_ = false;
     std::shared_ptr<MemoryLogDAL> memory_log_dal_;
 
     uint64_t root_;

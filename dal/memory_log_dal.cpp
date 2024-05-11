@@ -29,14 +29,16 @@ std::shared_ptr<MemoryLogMeta> MemoryLogDAL::GetMetaPtr() {
     return meta_;
 }
 
-void MemoryLogDAL::SavePage(uint64_t page_num, const std::shared_ptr<Page> &page) {
+void MemoryLogDAL::SavePage(const std::shared_ptr<Page> &page) {
     if (!file_.is_open())
         throw dal_error::FileError("File is closed");
-
+    auto saved_page_num = page->GetPageNum();
     page->SetPageNum(meta_->GetDataStartPage() + dirty_pages_.GetDataPtr()->size());
     WritePage(page);
+    // Return page_num state
+    page->SetPageNum(saved_page_num);
 
-    dirty_pages_.GetDataPtr()->push_back(page_num);
+    dirty_pages_.GetDataPtr()->push_back(saved_page_num);
     WriteDirtyPages();
 }
 

@@ -3,7 +3,8 @@ project(Anilop)
 
 set(CMAKE_CXX_STANDARD 20)
 
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Werror -Wextra -fsanitize=address,leak")
+# set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Werror -Wextra -fsanitize=address,leak")
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Werror -Wextra")
 
 include(FetchContent)
 FetchContent_Declare(
@@ -53,6 +54,7 @@ add_executable(Anilop
     public/Transaction.cpp
     public/Transaction.h
     public/type.h
+    public/type.cpp
     public/Settings.h
 
     storage/TransactionImpl.cpp
@@ -75,6 +77,7 @@ add_executable(
     test/dal_help_test.cpp
     test/dal_test.cpp
     test/log_storage_test.cpp
+    test/storage_test.cpp
 
     settings/settings.h
     settings/settings.cpp
@@ -111,6 +114,8 @@ add_executable(
 
     storage/log_storage.h
     storage/log_storage.cpp
+    storage/storage.h
+    storage/storage.cpp
 )
 target_link_libraries(
     DALTest

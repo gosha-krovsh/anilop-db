@@ -45,6 +45,23 @@ void Table::Remove(const Data &key) {
     tx->commit();
 }
 
+std::optional<std::string> Table::Find(const std::string& key) {
+    auto data = AnilopDB::StringToData(key);
+    auto data_opt = Find(data);
+    if (data_opt.has_value()) {
+        return AnilopDB::DataToString(data_opt.value());
+    }
+    return std::nullopt;
+}
+
+void Table::Put(const std::string &key, const std::string &data) {
+    Put(AnilopDB::StringToData(key), AnilopDB::StringToData(data));
+}
+
+void Table::Remove(const std::string &key) {
+    Remove(AnilopDB::StringToData(key));
+}
+
 Table::Table(const std::string& path, const Settings &settings)
     : path_(path) {
     settings::UserSettings user_settings;

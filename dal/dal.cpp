@@ -144,3 +144,11 @@ void DAL::readFreeList() {
 bool DAL::CanWrite() {
     return file_.is_open() && free_list_->HasFreePages();
 }
+
+std::shared_ptr<Page> DAL::GetFreeListPage() {
+    std::shared_ptr<Page> page = AllocateEmptyPage();
+    page->SetPageNum(meta_->GetFreeListPage());
+
+    free_list_->Serialize(page->Data(), settings::kPageSize);
+    return page;
+}

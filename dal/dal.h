@@ -27,6 +27,8 @@ public:
   std::shared_ptr<Page> ReadPage(uint64_t page_num);
   void WritePage(const std::shared_ptr<Page>& page);
 
+  std::shared_ptr<Page> GetFreeListPage();
+
   uint64_t GetNextPage();
   void ReleasePage(uint64_t page_num);
 
@@ -45,7 +47,6 @@ private:
   std::fstream file_;
 
   const uint64_t meta_page_num_ = 0;
-  std::shared_ptr<MemoryLogMeta> memory_log_meta_;
   std::shared_ptr<Meta> meta_;
   std::shared_ptr<FreeList> free_list_;
 

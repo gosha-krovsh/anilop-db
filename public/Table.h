@@ -33,6 +33,10 @@ namespace AnilopDB {
         void Put(const Data& key, const Data& data);
         void Remove(const Data& key);
 
+        std::optional<std::string> Find(const std::string& key);
+        void Put(const std::string& key, const std::string& data);
+        void Remove(const std::string& key);
+
         std::shared_ptr<Transaction> newReadTx();
         std::shared_ptr<Transaction> newWriteTx();
 
@@ -40,7 +44,6 @@ namespace AnilopDB {
 
     private:
         static std::unordered_map<std::string, std::shared_ptr<Table>> table_map_;
-
         explicit Table(const std::string& path, const Settings &settings);
 
         bool is_closed_ = false;

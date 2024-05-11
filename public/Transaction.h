@@ -26,10 +26,12 @@ namespace AnilopDB {
         Transaction &operator=(Transaction &&) = delete;
 
         std::optional<Data> Find(const Data &key);
-
         void Put(const Data &key, const Data &data);
-
         void Remove(const Data &key);
+
+        std::optional<std::string> Find(const std::string& key);
+        void Put(const std::string& key, const std::string& data);
+        void Remove(const std::string& key);
 
         void commit();
 

@@ -65,6 +65,7 @@ void Storage::Restore() {
         page->SetPageNum(pg_num);
         dal_->WritePage(page);
     }
+    save_started_ = false;
 }
 
 void Storage::ClearState() {
@@ -126,6 +127,10 @@ void Storage::PutInTreeImpl(const std::vector<byte> &key, const std::vector<byte
     if (root_ == 0) {
         root_node = std::make_shared<Node>();
         root_node->AddItem(new_item, 0);
+
+        WriteNode(root_node, true);
+        root_ = root_node->GetPageNum();
+        return;
     } else {
         root_node = GetNode(root_);
     }
@@ -137,11 +142,13 @@ void Storage::PutInTreeImpl(const std::vector<byte> &key, const std::vector<byte
         auto item = insert_node->ItemsPtr()->operator[](insert_index);
         if (std::memcmp(item->KeyData(), key.data(), std::min(item->ByteLength(), key.size())) == 0) {
             insert_node->ItemsPtr()->operator[](insert_index) = new_item;
+        } else {
+            insert_node->AddItem(new_item, insert_index);
         }
     } else {
         insert_node->AddItem(new_item, insert_index);
     }
-    WriteNode(insert_node);
+    WriteNode(insert_node, false);
 
     // Get all ancestors
     auto ancestors = GetNodes(ancestor_indices);
@@ -162,12 +169,15 @@ void Storage::PutInTreeImpl(const std::vector<byte> &key, const std::vector<byte
         new_root->SetPageNum(root_node->GetPageNum());
         Split(new_root, root_node, 0);
 
-        WriteNode(new_root);
+        WriteNode(new_root, true);
         root_ = new_root->GetPageNum();
     }
 }
 
 void Storage::RemoveInTreeImpl(const std::vector<byte> &key) {
+    if (root_ == 0) {
+        return;
+    }
     auto root_node = GetNode(root_);
 
     auto [remove_node, remove_index, ancestor_indices] = FindKey(key, true);
@@ -194,6 +204,9 @@ void Storage::RemoveInTreeImpl(const std::vector<byte> &key) {
     if (root_node->ItemsPtr()->empty() && !root_node->ChildNodesPtr()->empty()) {
         root_ = ancestors[1]->GetPageNum();
     }
+    else if (root_node->ItemsPtr()->empty()) {
+        root_ = 0;
+    }
 }
 
 
@@ -202,7 +215,7 @@ std::shared_ptr<Node> Storage::GetNode(uint64_t page_num) {
     std::shared_ptr<Node> node(new Node());
 
     node->SetPageNum(page_num);
-    node->Deserialize(page->Data(), dal_->GetMetaPtr()->GetPageSize());
+    node->Deserialize(page->Data(), settings::kPageSize);
     return node;
 }
 
@@ -214,11 +227,14 @@ std::vector<std::shared_ptr<Node>> Storage::GetNodes(const std::vector<uint64_t>
     return result;
 }
 
-void Storage::WriteNode(const std::shared_ptr<Node>& node) {
+void Storage::WriteNode(const std::shared_ptr<Node>& node, bool is_new) {
     std::shared_ptr<Page> page = dal_->AllocateEmptyPage();
-    if (node->GetPageNum() == 0) {
+    UpdateSaveProcess();
+
+    if (is_new) {
         uint64_t new_page_num = dal_->GetNextPage();
         node->SetPageNum(new_page_num);
+        page->SetPageNum(node->GetPageNum());
 
         memory_log_dal_->SavePageAllocation(node->GetPageNum());
     }
@@ -226,20 +242,30 @@ void Storage::WriteNode(const std::shared_ptr<Node>& node) {
         page->SetPageNum(node->GetPageNum());
         // Save node state before serialization
         dal_->ReadPage(node->GetPageNum());
-        memory_log_dal_->SavePage(page->GetPageNum(), page);
+        memory_log_dal_->SavePage(page);
     }
 
-    node->Serialize(page->Data(), dal_->GetMetaPtr()->GetPageSize());
+    node->Serialize(page->Data(), settings::kPageSize);
+    dal_->WritePage(page);
 }
 
-void Storage::DeleteNode(uint64_t page_num) { dal_->ReleasePage(page_num); }
+void Storage::DeleteNode(const std::shared_ptr<Node>& node) {
+    UpdateSaveProcess();
+    // Save node before deleting
+    std::shared_ptr<Page> page = dal_->AllocateEmptyPage();
+    page->SetPageNum(node->GetPageNum());
+    node->Serialize(page->Data(), settings::kPageSize);
+    memory_log_dal_->SavePage(page);
+
+    dal_->ReleasePage(node->GetPageNum());
+}
 
 double Storage::MaxThreshhold() {
-    return settings_.max_fill_percent * dal_->GetMetaPtr()->GetPageSize();
+    return settings_.max_fill_percent * settings::kPageSize;
 }
 
 double Storage::MinThreshhold() {
-    return settings_.min_fill_percent * dal_->GetMetaPtr()->GetPageSize();
+    return settings_.min_fill_percent * settings::kPageSize;
 }
 
 bool Storage::IsOverPopulated(const std::shared_ptr<Node>& node) {
@@ -264,8 +290,6 @@ std::tuple<std::shared_ptr<Node>, size_t> Storage::FindKeyRecursive(
     const std::vector<byte>& key,
     bool exact_key,
     std::vector<uint64_t>* ancestors) {
-    ancestors->emplace_back(node->GetPageNum());
-
     auto [index, was_found] = FindKeyInNode(node, key);
     if (was_found) {
         return std::tie(node, index);
@@ -277,6 +301,8 @@ std::tuple<std::shared_ptr<Node>, size_t> Storage::FindKeyRecursive(
         }
         return std::forward_as_tuple(std::nullptr_t(), 0);
     }
+
+    ancestors->emplace_back(node->GetPageNum());
 
     uint64_t child_page_num = (*node->ChildNodesPtr())[index];
     std::shared_ptr<Node> child_node = GetNode(child_page_num);
@@ -329,14 +355,14 @@ void Storage::Split(const std::shared_ptr<Node>& parent, const std::shared_ptr<N
     if (child->IsLeaf()) {
         (*new_node->ItemsPtr()) = {child->ItemsPtr()->begin() + split_index + 1,
                                    child->ItemsPtr()->end()};
-        WriteNode(new_node);
+        WriteNode(new_node, true);
         child->ItemsPtr()->resize(split_index);
     } else {
         (*new_node->ItemsPtr()) = {child->ItemsPtr()->begin() + split_index + 1,
                                    child->ItemsPtr()->end()};
         (*new_node->ChildNodesPtr()) = {child->ChildNodesPtr()->begin() + split_index + 1,
                                         child->ChildNodesPtr()->end()};
-        WriteNode(new_node);
+        WriteNode(new_node, true);
         child->ItemsPtr()->resize(split_index);
         child->ChildNodesPtr()->resize(split_index + 1);
     }
@@ -350,13 +376,13 @@ void Storage::Split(const std::shared_ptr<Node>& parent, const std::shared_ptr<N
         parent->ChildNodesPtr()->insert(parent->ChildNodesPtr()->begin() + child_index + 1,
                                         new_node->GetPageNum());
     }
-    WriteNode(parent);
-    WriteNode(child);
+    WriteNode(parent, false);
+    WriteNode(child, false);
 }
 
 void Storage::RemoveFromLeaf(const std::shared_ptr<Node>& node, size_t item_index) {
     node->ItemsPtr()->erase(node->ItemsPtr()->begin() + item_index);
-    WriteNode(node);
+    WriteNode(node, false);
 }
 
 std::vector<size_t> Storage::RemoveFromInternal(const std::shared_ptr<Node>& parent_node,
@@ -378,8 +404,8 @@ std::vector<size_t> Storage::RemoveFromInternal(const std::shared_ptr<Node>& par
     auto& current_items = *current_node->ItemsPtr();
     parent_items[item_index] = current_items[current_items.size() - 1];
 
-    WriteNode(parent_node);
-    WriteNode(current_node);
+    WriteNode(parent_node, false);
+    WriteNode(current_node, false);
     return affected_children;
 }
 
@@ -460,9 +486,9 @@ void Storage::Merge(const std::shared_ptr<Node>& parent, const std::shared_ptr<N
         }
     }
 
-    WriteNode(parent);
-    WriteNode(lhs_node);
-    DeleteNode(unbalanced->GetPageNum());
+    WriteNode(parent, false);
+    WriteNode(lhs_node, false);
+    DeleteNode(unbalanced);
 }
 
 void Storage::RemoveAndRebalance(const std::shared_ptr<Node>& parent,
@@ -472,9 +498,9 @@ void Storage::RemoveAndRebalance(const std::shared_ptr<Node>& parent,
         auto lhs_node = GetNode(parent->ChildNodesPtr()->operator[](u_node_index - 1));
         if (!IsUnderPopulated(lhs_node)) {
             RightRotate(lhs_node, parent, unbalanced, u_node_index);
-            WriteNode(lhs_node);
-            WriteNode(parent);
-            WriteNode(unbalanced);
+            WriteNode(lhs_node, false);
+            WriteNode(parent, false);
+            WriteNode(unbalanced, false);
 
             return;
         }
@@ -485,9 +511,9 @@ void Storage::RemoveAndRebalance(const std::shared_ptr<Node>& parent,
         auto rhs_node = GetNode(parent->ChildNodesPtr()->operator[](u_node_index + 1));
         if (!IsUnderPopulated(rhs_node)) {
             LeftRotate(unbalanced, parent, rhs_node, u_node_index);
-            WriteNode(rhs_node);
-            WriteNode(parent);
-            WriteNode(unbalanced);
+            WriteNode(rhs_node, false);
+            WriteNode(parent, false);
+            WriteNode(unbalanced, false);
 
             return;
         }
@@ -529,6 +555,15 @@ void Storage::PushLogAsync() {
     });
     // Thread is not joined, call is a non-blocking operation
     thread.detach();
+}
+
+void Storage::UpdateSaveProcess() {
+    if (!save_started_) {
+        auto freelist_page = dal_->GetFreeListPage();
+        memory_log_dal_->SavePage(freelist_page);
+
+        save_started_ = true;
+    }
 }
 
 Storage::~Storage() {

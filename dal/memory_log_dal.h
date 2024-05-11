@@ -23,7 +23,7 @@ public:
 
     std::shared_ptr<MemoryLogMeta> GetMetaPtr();
 
-    void SavePage(uint64_t page_num, const std::shared_ptr<Page>& page);
+    void SavePage(const std::shared_ptr<Page> &page);
     void SavePageAllocation(uint64_t page_num);
 
     std::vector<std::pair<uint64_t, std::shared_ptr<Page>>> GetSavedPages();

@@ -2,15 +2,21 @@
 
 using namespace AnilopDB;
 
+std::shared_ptr<DB> DB::db;
+
 std::shared_ptr<DB> DB::Open(const std::unordered_map<std::string, std::string>& code_path_map,
                              const AnilopDB::Settings &settings) {
-    return std::shared_ptr<DB>(new DB(code_path_map, settings));
-}
-
-DB::DB(std::unordered_map<std::string, std::string> code_path_map, const Settings &settings) {
-    for (const auto& [code, path]: code_path_map) {
-        table_map_[code] = std::shared_ptr<Table>(new Table(code, path, settings));
+    if (!db) {
+        db = std::shared_ptr<DB>(new DB());
     }
+
+    for (const auto& [code, path]: code_path_map) {
+        if (db->table_map_.contains(code))
+            continue;
+
+        db->table_map_[code] = std::shared_ptr<Table>(new Table(code, path, settings));
+    }
+    return db;
 }
 
 std::shared_ptr<Transaction> DB::newReadTx(const std::vector<std::string>& codes) {
@@ -75,4 +81,11 @@ void DB::Put(const std::string &code, const std::string &key, const std::string 
 
 void DB::Remove(const std::string &code, const std::string &key) {
     Remove(code, AnilopDB::StringToData(key));
+}
+
+void DB::Close() {
+    for (auto [_, table] : table_map_) {
+        table->Close();
+    }
+    table_map_.clear();
 }

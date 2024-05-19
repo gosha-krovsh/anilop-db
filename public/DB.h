@@ -31,9 +31,11 @@ namespace AnilopDB {
         std::shared_ptr<Transaction> newReadTx(const std::vector<std::string>& codes);
         std::shared_ptr<Transaction> newWriteTx(const std::vector<std::string>& codes);
 
+        void Close();
+
     private:
         static std::shared_ptr<DB> db;
-        explicit DB(std::unordered_map<std::string, std::string> code_path_map, const Settings &settings);
+        DB() = default;
 
         std::vector<std::shared_ptr<Table>> getTxTables(const std::vector<std::string>& codes);
 

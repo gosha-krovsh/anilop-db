@@ -6,6 +6,7 @@
 #include <cstdint>
 #include <memory>
 #include <string>
+#include <mutex>
 
 #include "log.h"
 #include "page.h"
@@ -25,6 +26,7 @@ public:
     void WriteLog(const Log &log);
 
     void ClearLogs();
+    void ClearLatest(uint64_t offset_to_end);
     void Close();
 
     ~LogDAL();
@@ -33,11 +35,13 @@ private:
     void WriteMeta();
     void ReadMeta();
 
+    std::string path_;
     std::fstream file_;
-    uint64_t current_data_offset_;
 
     const uint64_t meta_offset_ = 0;
     std::shared_ptr<LogMeta> meta_;
+
+    std::recursive_mutex mutex_;
 };
 
 

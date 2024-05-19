@@ -6,6 +6,7 @@
 #include <tuple>
 #include <shared_mutex>
 #include <mutex>
+#include <thread>
 
 #include "dal/dal.h"
 #include "dal/log_dal.h"
@@ -88,6 +89,7 @@ class Storage {
     void UpdateSaveProcess();
 
     std::shared_mutex mutex_;
+    std::thread log_thread_;
 
     settings::UserSettings settings_;
 

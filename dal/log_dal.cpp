@@ -1,7 +1,8 @@
 #include "log_dal.h"
 
 LogDAL::LogDAL(const std::string &path, const settings::UserSettings &)
-    : meta_(new LogMeta()) {
+    : path_(path)
+    , meta_(new LogMeta()) {
     bool file_exist = std::filesystem::exists(path);
     if (file_exist) {
         file_.open(path,  std::fstream::in | std::fstream::out);
@@ -22,6 +23,7 @@ std::shared_ptr<LogMeta> LogDAL::GetMetaPtr() {
 }
 
 std::vector<byte> LogDAL::ReadLogBuffer() {
+    std::unique_lock lock(mutex_);
     if (!file_.is_open())
         throw dal_error::FileError("File is closed");
 
@@ -39,6 +41,7 @@ std::vector<byte> LogDAL::ReadLogBuffer() {
 }
 
 void LogDAL::WriteLog(const Log &log) {
+    std::unique_lock lock(mutex_);
     if (!file_.is_open())
         throw dal_error::FileError("File is closed");
 
@@ -62,14 +65,20 @@ void LogDAL::WriteLog(const Log &log) {
 }
 
 void LogDAL::ClearLogs() {
+    std::unique_lock lock(mutex_);
     if (!file_.is_open())
         throw dal_error::FileError("File is closed");
 
-    file_.clear();
+    // Open close to clear logs
+    file_.close();
+    file_.open(path_,  std::fstream::in | std::fstream::out | std::fstream::trunc);
+
+    meta_->SetDataEndOffset(meta_->GetSize());
     WriteMeta();
 }
 
 void LogDAL::Close() {
+    std::unique_lock lock(mutex_);
     if (!file_.is_open())
         throw dal_error::FileError("File is already closed");
 
@@ -80,12 +89,14 @@ void LogDAL::Close() {
 }
 
 LogDAL::~LogDAL() {
+    std::unique_lock lock(mutex_);
     if (file_.is_open()) {
         Close();
     }
 }
 
 void LogDAL::WriteMeta() {
+    std::unique_lock lock(mutex_);
     file_.seekp(meta_offset_, file_.beg);
 
     std::vector<byte> meta_buffer(meta_->GetSize());
@@ -95,6 +106,7 @@ void LogDAL::WriteMeta() {
 }
 
 void LogDAL::ReadMeta() {
+    std::unique_lock lock(mutex_);
     file_.seekg(meta_offset_, file_.beg);
 
     std::vector<byte> meta_buffer(meta_->GetSize());
@@ -103,3 +115,12 @@ void LogDAL::ReadMeta() {
     meta_->Deserialize(meta_buffer.data(), meta_->GetSize());
 }
 
+void LogDAL::ClearLatest(uint64_t offset_to_end) {
+    auto max_offset = meta_->GetDataEndOffset() - meta_->GetSize();
+    if (offset_to_end > max_offset) {
+        offset_to_end = max_offset;
+    }
+
+    meta_->SetDataEndOffset(meta_->GetDataEndOffset() - offset_to_end);
+    WriteMeta();
+}

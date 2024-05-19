@@ -58,9 +58,11 @@ void Storage::Restore() {
     auto saved_allocation = memory_log_dal_->GetSavedPageAllocations();
     auto saved_pages = memory_log_dal_->GetSavedPages();
 
+    // This is redundant, but is here for extra safety
     for (auto pg_num : saved_allocation)
         dal_->ReleasePage(pg_num);
 
+    // First page must always be freelist
     for (auto [pg_num, page] : saved_pages) {
         page->SetPageNum(pg_num);
         dal_->WritePage(page);
@@ -251,10 +253,11 @@ void Storage::WriteNode(const std::shared_ptr<Node>& node, bool is_new) {
 
 void Storage::DeleteNode(const std::shared_ptr<Node>& node) {
     UpdateSaveProcess();
-    // Save node before deleting
+    // Read node page
     std::shared_ptr<Page> page = dal_->AllocateEmptyPage();
     page->SetPageNum(node->GetPageNum());
-    node->Serialize(page->Data(), settings::kPageSize);
+    // Save page, before deleting
+    dal_->ReadPage(node->GetPageNum());
     memory_log_dal_->SavePage(page);
 
     dal_->ReleasePage(node->GetPageNum());
@@ -550,11 +553,14 @@ void Storage::PushLog() {
 }
 
 void Storage::PushLogAsync() {
-    auto thread = std::thread([this]() mutable {
+    if (log_thread_.joinable()) {
+        log_thread_.join();
+    }
+    log_thread_ = std::thread([this]() mutable {
         PushLog();
     });
-    // Thread is not joined, call is a non-blocking operation
-    thread.detach();
+    // Thread is not joined here. Call is a non_blocking operation, whether previous logic is finished
+    // Thread is joined before another start or in destructor
 }
 
 void Storage::UpdateSaveProcess() {
@@ -567,6 +573,9 @@ void Storage::UpdateSaveProcess() {
 }
 
 Storage::~Storage() {
+    if (log_thread_.joinable()) {
+        log_thread_.join();
+    }
     PushLog();
 }
 

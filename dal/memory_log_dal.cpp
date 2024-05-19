@@ -1,7 +1,7 @@
 #include "memory_log_dal.h"
 
 MemoryLogDAL::MemoryLogDAL(const std::string &path, const settings::UserSettings&)
-    : file_()
+    : path_(path)
     , meta_(new MemoryLogMeta()) {
     bool file_exist = std::filesystem::exists(path);
     if (file_exist) {
@@ -75,8 +75,14 @@ void MemoryLogDAL::Clear() {
     dirty_pages_.Clear();
     new_pages_.Clear();
 
-    file_.clear();
+    // Open close to clear logs
+    file_.close();
+    file_.open(path_,  std::fstream::in | std::fstream::out | std::fstream::trunc);
 
+    // Set up meta
+    meta_->SetDirtyPage(1);
+    meta_->SetAllocatedPage(2);
+    meta_->SetDataStartPage(3);
     WriteMeta();
     // Write empty ones by default
     WriteNewPages();
@@ -84,6 +90,7 @@ void MemoryLogDAL::Clear() {
 }
 
 void MemoryLogDAL::Close() {
+    std::unique_lock lock(mutex_);
     if (!file_.is_open())
         throw dal_error::FileError("File is closed");
 
@@ -91,6 +98,7 @@ void MemoryLogDAL::Close() {
 }
 
 MemoryLogDAL::~MemoryLogDAL() {
+    std::unique_lock lock(mutex_);
     if (file_.is_open()) {
         Close();
     }
@@ -101,6 +109,8 @@ std::shared_ptr<Page> MemoryLogDAL::AllocateEmptyPage() {
 }
 
 std::shared_ptr<Page> MemoryLogDAL::ReadPage(uint64_t page_num) {
+    std::unique_lock lock(mutex_);
+
     std::shared_ptr<Page> page = AllocateEmptyPage();
     // Page offset in file
     uint64_t offset = page_num * settings::kPageSize;
@@ -118,6 +128,8 @@ std::shared_ptr<Page> MemoryLogDAL::ReadPage(uint64_t page_num) {
 }
 
 void MemoryLogDAL::WritePage(const std::shared_ptr<Page> &page) {
+    std::unique_lock lock(mutex_);
+
     uint64_t offset = page->GetPageNum() * settings::kPageSize;
     // Write page into file
     file_.seekp(offset);

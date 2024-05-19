@@ -6,6 +6,7 @@
 #include <cstdint>
 #include <memory>
 #include <string>
+#include <mutex>
 
 #include "log.h"
 #include "page.h"
@@ -50,7 +51,7 @@ private:
   std::shared_ptr<Meta> meta_;
   std::shared_ptr<FreeList> free_list_;
 
-  std::mutex mutex_;
+  std::recursive_mutex mutex_;
 };
 
 #endif  // DAL_H_

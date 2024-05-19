@@ -6,6 +6,7 @@
 #include <cstdint>
 #include <memory>
 #include <string>
+#include <mutex>
 
 #include "log.h"
 #include "page.h"
@@ -48,6 +49,7 @@ private:
     void WriteNewPages();
     void ReadAllPages();
 
+    std::string path_;
     std::fstream file_;
 
     const uint64_t meta_page_num_ = 0;
@@ -55,6 +57,8 @@ private:
 
     NumList dirty_pages_;
     NumList new_pages_;
+
+    std::recursive_mutex mutex_;
 };
 
 

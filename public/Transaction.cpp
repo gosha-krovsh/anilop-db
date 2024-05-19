@@ -4,52 +4,66 @@
 
 using namespace AnilopDB;
 
-Transaction::Transaction(
-        bool is_write,
-        std::shared_ptr<Storage> storage,
-        std::shared_mutex &mutex)
-        : impl_(new TransactionImpl (is_write,
-                                     std::move(storage),
-                                     mutex))
-{}
-
-std::optional<Data> Transaction::Find(const Data& key) {
-    return impl_->Find(key);
+Transaction::Transaction(bool is_write,
+                         const std::vector<std::shared_ptr<Table>>& tables) {
+    for (const auto& table : tables) {
+        impls_.push_back(new TransactionImpl(is_write, table->storage_, table->tx_mutex_));
+        code_impl_[table->code_] = impls_.back();
+    }
 }
 
-void Transaction::Put(const Data &key, const Data &data) {
-    impl_->Put(key, data);
+std::optional<Data> Transaction::Find(const std::string& code, const Data& key) {
+    if (!code_impl_.contains(code))
+        throw std::runtime_error("Invalid table code.");
+
+    return code_impl_[code]->Find(key);
 }
 
-void Transaction::Remove(const Data &key) {
-    impl_->Remove(key);
+void Transaction::Put(const std::string& code, const Data &key, const Data &data) {
+    if (!code_impl_.contains(code))
+        throw std::runtime_error("Invalid table code.");
+
+    code_impl_[code]->Put(key, data);
 }
 
-std::optional<std::string> Transaction::Find(const std::string& key) {
+void Transaction::Remove(const std::string& code, const Data &key) {
+    if (!code_impl_.contains(code))
+        throw std::runtime_error("Invalid table code.");
+
+    code_impl_[code]->Remove(key);
+}
+
+std::optional<std::string> Transaction::Find(const std::string& code, const std::string& key) {
     auto data = AnilopDB::StringToData(key);
-    auto data_opt = Find(data);
+    auto data_opt = Find(code, data);
     if (data_opt.has_value()) {
         return AnilopDB::DataToString(data_opt.value());
     }
     return std::nullopt;
 }
 
-void Transaction::Put(const std::string &key, const std::string &data) {
-    Put(AnilopDB::StringToData(key), AnilopDB::StringToData(data));
+void Transaction::Put(const std::string& code, const std::string &key, const std::string &data) {
+    Put(code, AnilopDB::StringToData(key), AnilopDB::StringToData(data));
 }
 
-void Transaction::Remove(const std::string &key) {
-    Remove(AnilopDB::StringToData(key));
+void Transaction::Remove(const std::string& code, const std::string &key) {
+    Remove(code, AnilopDB::StringToData(key));
 }
 
 void Transaction::commit() {
-    impl_->commit();
+    for (auto impl : impls_) {
+        impl->commit();
+    }
 }
 
 void Transaction::rollback() {
-    impl_->rollback();
+    for (auto impl : impls_) {
+        impl->rollback();
+    }
 }
 
 Transaction::~Transaction() {
-    delete impl_;
+    for (auto impl : impls_) {
+        delete impl;
+    }
 }

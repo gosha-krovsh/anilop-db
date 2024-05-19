@@ -37,9 +37,6 @@ private:
     void WriteLog(const Log& log);
     void WriteLogToMemory(const Log& log);
 
-    void WriteMeta();
-    void ReadMeta();
-
     std::list<Log> memory_log_;
     std::unordered_map<std::string, std::vector<std::list<Log>::iterator>> key_to_memory_log_;
 

@@ -1,7 +1,6 @@
 #include "dal.h"
 
 #include <memory>
-#include <mutex>
 
 DAL::DAL(const std::string& path,
          const settings::UserSettings&) :
@@ -35,9 +34,9 @@ std::shared_ptr<Page> DAL::AllocateEmptyPage() {
 }
 
 std::shared_ptr<Page> DAL::ReadPage(uint64_t page_num) {
+    std::unique_lock lock(mutex_);
     if (!file_.is_open())
         throw dal_error::FileError("File is closed");
-    std::unique_lock lock(mutex_);
 
     std::shared_ptr<Page> page = AllocateEmptyPage();
     // Page offset in file
@@ -56,9 +55,9 @@ std::shared_ptr<Page> DAL::ReadPage(uint64_t page_num) {
 }
 
 void DAL::WritePage(const std::shared_ptr<Page>& page) {
+    std::unique_lock lock(mutex_);
     if (!file_.is_open())
         throw dal_error::FileError("File is closed");
-    std::unique_lock lock(mutex_);
 
     uint64_t offset = page->GetPageNum() * settings::kPageSize;
     // Write page into file
@@ -78,6 +77,7 @@ void DAL::WritePage(const std::shared_ptr<Page>& page) {
 }
 
 uint64_t DAL::GetNextPage() {
+    std::unique_lock lock(mutex_);
     if (!file_.is_open())
         throw dal_error::FileError("File is closed");
 
@@ -88,6 +88,7 @@ uint64_t DAL::GetNextPage() {
 }
 
 void DAL::ReleasePage(uint64_t page_num) {
+    std::unique_lock lock(mutex_);
     if (!file_.is_open())
         throw dal_error::FileError("File is closed");
 
@@ -97,6 +98,7 @@ void DAL::ReleasePage(uint64_t page_num) {
 }
 
 void DAL::Close() {
+    std::unique_lock lock(mutex_);
     if (!file_.is_open())
         throw dal_error::FileError("File is closed");
 
@@ -110,6 +112,7 @@ void DAL::Close() {
 }
 
 DAL::~DAL() {
+    std::unique_lock lock(mutex_);
     if (file_.is_open()) {
         Close();
     }
@@ -142,6 +145,7 @@ void DAL::readFreeList() {
 }
 
 bool DAL::CanWrite() {
+    std::unique_lock lock(mutex_);
     return file_.is_open() && free_list_->HasFreePages();
 }
 

@@ -51,6 +51,8 @@ add_executable(Anilop
 
     public/Table.cpp
     public/Table.h
+    public/DB.cpp
+    public/DB.h
     public/Transaction.cpp
     public/Transaction.h
     public/type.h

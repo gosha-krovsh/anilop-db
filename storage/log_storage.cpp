@@ -5,12 +5,43 @@ LogStorage::LogStorage(std::shared_ptr<DAL> dal, std::shared_ptr<LogDAL> log_dal
     auto log_buffer = log_dal_->ReadLogBuffer();
     auto log_buffer_ptr = log_buffer.data();
     uint64_t buffer_size_left = log_buffer.size();
+
+    size_t start_count = 0;
+    size_t commit_count = 0;
     while (buffer_size_left > 0) {
         auto log = Log::readFromBuffer(log_buffer_ptr, buffer_size_left);
         log_buffer_ptr += log.GetByteLength();
         buffer_size_left -= log.GetByteLength();
 
+        if (log.GetCommand() == Log::Command::START)
+            start_count++;
+        if (log.GetCommand() == Log::Command::COMMIT)
+            commit_count++;
         WriteLogToMemory(log);
+    }
+
+    auto log_index = memory_log_.size() - 1;
+    uint64_t clear_offset = 0;
+    while (log_index > 0 && commit_count != start_count) {
+        auto log_it = memory_log_.begin();
+        std::advance(log_it, log_index);
+
+        auto log = *log_it;
+        if (log.GetCommand() == Log::Command::START)
+            --start_count;
+        if (log.GetCommand() == Log::Command::COMMIT)
+            --commit_count;
+
+        clear_offset += log.GetByteLength();
+
+        auto str_key = ConvertToStr(log.GetKey());
+        key_to_memory_log_[str_key].pop_back();
+
+        memory_log_.erase(log_it);
+        --log_index;
+    }
+    if (clear_offset > 0) {
+        log_dal_->ClearLatest(clear_offset);
     }
 }
 
@@ -75,9 +106,9 @@ void LogStorage::Clear() {
 }
 
 void LogStorage::PushTransactionLogs(const std::vector<Log> &logs) {
+    WriteLog({ Log::Command::START });
     for (const auto& log : logs)
         WriteLog(log);
-
     WriteLog({ Log::Command::COMMIT });
 }
 
@@ -89,7 +120,8 @@ void LogStorage::WriteLog(const Log &log) {
 void LogStorage::WriteLogToMemory(const Log &log) {
     memory_log_.push_back(log);
 
-    if (log.GetCommand() == Log::Command::COMMIT)
+    if (log.GetCommand() == Log::Command::START
+        || log.GetCommand() == Log::Command::COMMIT)
         return;
 
     auto str_key = ConvertToStr(log.GetKey());

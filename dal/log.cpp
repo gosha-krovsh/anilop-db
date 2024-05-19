@@ -16,7 +16,7 @@ Log::Log(Log::Command command, const std::vector<byte> &key)
 }
 
 Log::Log(Log::Command command) : command_(command) {
-    assert(command_ == Command::COMMIT);
+    assert(command_ == Command::START || command_ == Command::COMMIT);
 }
 
 size_t Log::Serialize(byte *data, size_t max_volume) const {

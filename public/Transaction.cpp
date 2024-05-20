@@ -1,3 +1,4 @@
+#include <ranges>
 #include "Transaction.h"
 
 #include "storage/TransactionImpl.h"
@@ -51,13 +52,13 @@ void Transaction::Remove(const std::string& code, const std::string &key) {
 }
 
 void Transaction::commit() {
-    for (auto impl : impls_) {
+    for (auto impl : std::ranges::reverse_view(impls_)) {
         impl->commit();
     }
 }
 
 void Transaction::rollback() {
-    for (auto impl : impls_) {
+    for (auto impl : std::ranges::reverse_view(impls_)) {
         impl->rollback();
     }
 }

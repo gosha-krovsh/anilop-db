@@ -42,3 +42,42 @@ TEST(Storage, TreeWorkflow) {
         ASSERT_FALSE(result.has_value());
     }
 }
+
+TEST(Storage, StorageCrash) {
+    if (std::filesystem::exists("storage.db.log")) {
+        std::filesystem::remove("storage.db.log");
+    }
+    if (std::filesystem::exists("storage.db.mlog")) {
+        std::filesystem::remove("storage.db.mlog");
+    }
+    if (std::filesystem::exists("storage.db")) {
+        std::filesystem::remove("storage.db");
+    }
+    settings::UserSettings settings;
+    auto storage = std::make_shared<Storage>("storage.db", settings);
+
+    {
+        std::vector<byte> key(8);
+        std::memcpy(key.data(), "Goodbye", 8);
+        std::vector<byte> data(6);
+        std::memcpy(data.data(), "World", 6);
+        ASSERT_NO_THROW(storage->Put(key, data));
+        throw std::runtime_error("Boom");
+    }
+}
+
+TEST(Storage, StorageRecovery) {
+    settings::UserSettings settings;
+    auto storage = std::make_shared<Storage>("storage.db", settings);
+
+    {
+        std::vector<byte> key(8);
+        std::memcpy(key.data(), "Goodbye", 8);
+        std::vector<byte> data(6);
+        std::memcpy(data.data(), "World", 6);
+
+        auto data_opt = storage->Find(key);
+        ASSERT_TRUE(data_opt.has_value());
+        ASSERT_EQ(*data_opt, data);
+    }
+}

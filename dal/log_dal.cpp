@@ -103,6 +103,13 @@ void LogDAL::WriteMeta() {
     meta_->Serialize(meta_buffer.data(), meta_->GetSize());
 
     file_.write(meta_buffer.data(), meta_->GetSize());
+    if (file_.fail()) {
+        throw dal_error::FileError("File Write failed.");
+    }
+    file_.flush();
+    if (file_.fail()) {
+        throw dal_error::FileError("File Flush failed.");
+    }
 }
 
 void LogDAL::ReadMeta() {

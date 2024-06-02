@@ -131,7 +131,9 @@ void Storage::PutInTreeImpl(const std::vector<byte> &key, const std::vector<byte
         root_node->AddItem(new_item, 0);
 
         WriteNode(root_node, true);
+        // Update root_;
         root_ = root_node->GetPageNum();
+        dal_->GetMetaPtr()->SetRootPage(root_);
         return;
     } else {
         root_node = GetNode(root_);
@@ -173,6 +175,7 @@ void Storage::PutInTreeImpl(const std::vector<byte> &key, const std::vector<byte
 
         WriteNode(new_root, true);
         root_ = new_root->GetPageNum();
+        dal_->GetMetaPtr()->SetRootPage(root_);
     }
 }
 
@@ -205,9 +208,11 @@ void Storage::RemoveInTreeImpl(const std::vector<byte> &key) {
 
     if (root_node->ItemsPtr()->empty() && !root_node->ChildNodesPtr()->empty()) {
         root_ = ancestors[1]->GetPageNum();
+        dal_->GetMetaPtr()->SetRootPage(root_);
     }
     else if (root_node->ItemsPtr()->empty()) {
         root_ = 0;
+        dal_->GetMetaPtr()->SetRootPage(root_);
     }
 }
 

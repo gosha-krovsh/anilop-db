@@ -1,6 +1,8 @@
 # AnilopDB
 
-AnilopDB is a durable NoSQL database solution. It's a great example of how simplicity and durability can be met together. Get closer with it using convinient public interface.
+AnilopDB is a durable NoSQL database solution with support of all ACID principles. It's a great example of how simplicity and durability can be met together.
+
+Don't be shy to get closer with it using convenient public interface!
 
 # Example
 
